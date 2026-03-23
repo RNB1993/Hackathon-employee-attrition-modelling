@@ -1,4 +1,7 @@
-# ![CI logo](https://codeinstitute.s3.amazonaws.com/fullstack/ci_logo_small.png)
+
+# IBM HR Analytics Employee Attrition & Performance
+
+![CI logo](https://codeinstitute.s3.amazonaws.com/fullstack/ci_logo_small.png)
 
 ## Template Instructions
 
