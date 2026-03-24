@@ -17,6 +17,10 @@ Hackathon-employee-attrition-modelling/
 |   |-- EDA.ipynb
 |   `-- Notebook_Template.ipynb
 ```
+# Team Members
+    Role: 
+    Name: 
+    LinkedIn/GitHub: 
 
 ## Dataset Content
 * Describe your dataset. Choose a dataset of reasonable size to avoid exceeding the repository's maximum size of 100Gb.
