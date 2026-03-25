@@ -91,8 +91,9 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 * How did you use generative AI tools to help with ideation, design thinking and code optimisation?
 
 ## Ethical considerations
-* Were there any data privacy, bias or fairness issues with the data?
-* How did you overcome any legal or societal issues?
+* The HR Employee Attrition dataset contains information about a business’s employees, such as age, gender, education, and monthly income. Although the data is anonymised and does not include personal information, there may still be a risk of bias. Variables like gender, education level, and income may introduce routine biases and lead to unfair or discriminatory outcomes if not handled thoughtfully. But this dataset was  analysed to see the positive and negative impacts on the attrition rate, so we can give insights on how to improve retention
+The dataset was used in compliance with data protection standards (UK GDPR), ensuring that everything was anonymous and there were no attempts to identify individual workers. Also, it was used for academic outcomes.
+
 
 ## Dashboard Design
 * List all dashboard pages and their content, either blocks of information or widgets, like buttons, checkboxes, images, or any other item that your dashboard library supports.
