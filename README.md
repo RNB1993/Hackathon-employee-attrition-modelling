@@ -77,9 +77,13 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 * List here your project hypothesis(es) and how you envision validating it (them) 
 
 ## Project Plan
-* Outline the high-level steps taken for the analysis.
-* How was the data managed throughout the collection, processing, analysis and interpretation steps?
-* Why did you choose the research methodologies you used?
+* The project was completed over four days using a structured and collaborative workflow. Regular morning meetings throughout the project ensured alignment, allowing the team to review progress, share findings, and make informed decisions on how to move forward toward completion.
+
+- Day one, roles were assigned and the dataset was selected, while the project manager created a detailed project board to organise tasks and timelines. Each team member then worked independently on their assigned responsibilities, with progress shared during scheduled meetings. 
+- Day two, exploratory data analysis (EDA) and ETL processes were completed, which informed the development of the project hypothesis. The business case summary was also defined and written, and the group collectively decided on the key outputs and visuals for the Power BI dashboard. 
+- Day three involved continued development of the dashboard and Jupyter notebooks, alongside incremental updates to the README, with group discussions guiding next steps. 
+- Day four, the focus shifted to consolidating all individual contributions and developing the final presentation slides. 
+
 
 ## The rationale to map the business requirements to the Data Visualisations
 * List your business requirements and a rationale to map them to the Data Visualisations
