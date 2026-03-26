@@ -320,23 +320,45 @@ The dashboard was designed to balance analytical depth with clarity. Visuals are
 | `feature-engine` | Feature engineering — outlier capping via Winsorizer |
 
 
+
+## Unfixed Bugs
+At the current stage of the project, there are no major known bugs that prevent the main workflow from running as intended. The notebooks are separated by stage and the core outputs are saved into structured folders for reuse.
+
+## Development Roadmap
+
+* Time issues 
+* Conflicts over interviews, asessments during day 3 and day 5
+* First time working on a project as a group. 
+* Spent a long time working out roles and duties. 
+
+## Deployment
+
+### Clone the repo
+```bash
+git clone https://github.com/RNB1993/Hackathon-employee-attrition-modelling.git
+```
+#### Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+## Main Data Analysis Libraries
+
+| Library | Purpose |
+|---|---|
+| `pandas` | Data loading, manipulation, and tabular analysis |
+| `numpy` | Numerical operations and array handling |
+| `matplotlib` / `seaborn` | Visualisation — distributions, heatmaps, and bar charts |
+| `scikit-learn` | Machine learning — logistic regression, gradient boosting, pipelines, preprocessing, and model evaluation |
+| `pingouin` | Statistical testing — Mann-Whitney U tests across categorical variables |
+| `feature-engine` | Feature engineering — outlier capping via Winsorizer |
+
+
 ## Credits 
-
-* In this section, you need to reference where you got your content, media and extra help from. It is common practice to use code from other repositories and tutorials, however, it is important to be very specific about these sources to avoid plagiarism. 
-* You can break the credits section up into Content and Media, depending on what you have included in your project. 
-
-### Content 
-
-- The text for the Home page was taken from Wikipedia Article A
-- Instructions on how to implement form validation on the Sign-Up page was taken from [Specific YouTube Tutorial](https://www.youtube.com/)
-- The icons in the footer were taken from [Font Awesome](https://fontawesome.com/)
-
-### Media
-
-- The photos used on the home and sign-up page are from This Open-Source site
-- The images used for the gallery page were taken from this other open-source site
+IBM HR Employee Attrition dataset  https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset 
 
 
 
-## Acknowledgements (optional)
-* Thank the people who provided support through this project.
+
+## Acknowledgements
+* Thanks to the instructors (Vasi, Mark, and Neil), walkthrough materials, and feedback sources that supported the development of this project, as well as the broader learning content that helped shape the analytical and ethical approach used throughout.
