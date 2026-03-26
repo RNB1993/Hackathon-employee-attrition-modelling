@@ -8,19 +8,34 @@
 
 ```text
 Hackathon-employee-attrition-modelling/
-|-- .github/
-|-- dashboard/
+|-- Procfile
+|-- README.md
+|-- requirements.txt
+|-- setup.sh
+|-- data/
+|   |-- Cleaned_dataset/
+|   |   `-- WA_Fn-UseC_-HR-Employee-Attrition_capped.csv
+|   `-- Raw_data/
+|       `-- WA_Fn-UseC_-HR-Employee-Attrition.csv
 |-- images/
-|   |-- project-board-earlystateview.png
-|   `-- project-board-earlyview.png
 |-- jupyter_notebooks/
 |   |-- EDA.ipynb
-|   `-- Notebook_Template.ipynb
+|   |-- Feature_engineering.ipynb
+|   |-- Stats_Tests.ipynb
+|   `-- model/
 ```
 # Team Members
-    Role: 
-    Name: 
-    LinkedIn/GitHub: 
+    Role: PM / Scrum master
+    Name: Ryan Brooker
+
+    Role: ETL, EDA, ML  
+    Name: Ezeokoronkwo Alban Chigozirim
+
+    Role: Dashboard Design 
+    Name: Sarika Morker
+
+    Role: Documentation SME
+    Name: Faithlynne Farrell-Walters
 
 ## Dataset Content
 
@@ -72,6 +87,13 @@ The project also explores several hypotheses around potential drivers of attriti
 
 These hypotheses are tested through exploratory data analysis and visualisation.
 
+---
+
+## Feature Importance
+
+![Feature Importance](images/feature-IM.png)
+
+---
 
 ## Hypothesis and how to validate?
 
@@ -127,6 +149,7 @@ These conclusions are drawn by cross-referencing outputs that were designed for 
 * The project was completed over four days using a structured and collaborative workflow. Regular morning meetings throughout the project ensured alignment, allowing the team to review progress, share findings, and make informed decisions on how to move forward toward completion.
 
 - Day one, roles were assigned and the dataset was selected, while the project manager created a detailed project board to organise tasks and timelines. Each team member then worked independently on their assigned responsibilities, with progress shared during scheduled meetings. 
+
 - Day two, exploratory data analysis (EDA) and ETL processes were completed, which informed the development of the project hypothesis. The business case summary was also defined and written, and the group collectively decided on the key outputs and visuals for the Power BI dashboard. 
 - Day three involved continued development of the dashboard and Jupyter notebooks, alongside incremental updates to the README, with group discussions guiding next steps. 
 - Day four, the focus shifted to consolidating all individual contributions and developing the final presentation slides. 
@@ -185,6 +208,29 @@ From a business perspective, these findings suggest that retention strategies sh
 - understanding how multiple workplace factors combine to influence turnover  
 
 It is important to note that these feature importance results show **model associations rather than proof of causation**, but they provide a strong basis for further HR investigation and targeted retention planning.
+
+## Models
+
+This repository includes two pre-trained machine learning models, saved as pickle files in the `jupyter_notebooks/model/` directory:
+
+### 1. **attrition_minority_yes_best_model.pkl**
+The primary and best-performing predictive model for employee attrition. This model was trained and optimized to accurately predict whether an employee is likely to leave the organization. It incorporates all engineered features and represents the highest performing configuration based on the project's evaluation metrics.
+
+### 2. **attrition_minority_yes_business_cost_second_best.pkl**
+A secondary model optimized with business cost considerations in mind. This model balances predictive accuracy with real-world business constraints and may prioritize different aspects of model performance (e.g., reducing false negatives for high-risk employees).
+
+Both models can be loaded and used for predictions on new employee data using Python's pickle library:
+
+```python
+import pickle
+
+# Load the best model
+with open('jupyter_notebooks/model/attrition_minority_yes_best_model.pkl', 'rb') as f:
+    model = pickle.load(f)
+
+# Make predictions
+predictions = model.predict(new_employee_data)
+```
 
 ## Analysis techniques used
 * List the data analysis methods used and explain limitations or alternative approaches.
