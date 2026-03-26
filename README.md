@@ -200,7 +200,11 @@ The dataset was used in compliance with data protection standards (UK GDPR), ens
 ## Dashboard Design
 ## Dashboard Screenshot
 
-![Employee Attrition Dashboard](images/dashboard.png)
+## Dashboard Screenshot
+
+## Dashboard Screenshot
+
+![Employee Attrition Dashboard](images/Dashboard.png)
 
 This single-page Power BI dashboard was designed to test four hypotheses related to employee attrition. It includes the following components:
 Widgets and Layout
