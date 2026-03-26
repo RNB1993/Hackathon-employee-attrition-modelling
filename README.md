@@ -232,12 +232,6 @@ with open('jupyter_notebooks/model/attrition_minority_yes_best_model.pkl', 'rb')
 predictions = model.predict(new_employee_data)
 ```
 
-## Analysis techniques used
-* List the data analysis methods used and explain limitations or alternative approaches.
-* How did you structure the data analysis techniques. Justify your response.
-* Did the data limit you, and did you use an alternative approach to meet these challenges?
-* How did you use generative AI tools to help with ideation, design thinking and code optimisation?
-
 ## Ethical considerations
 * The HR Employee Attrition dataset contains information about a business’s employees, such as age, gender, education, and monthly income. Although the data is anonymised and does not include personal information, there may still be a risk of bias. Variables like gender, education level, and income may introduce routine biases and lead to unfair or discriminatory outcomes if not handled thoughtfully. But this dataset was  analysed to see the positive and negative impacts on the attrition rate, so we can give insights on how to improve retention
 The dataset was used in compliance with data protection standards (UK GDPR), ensuring that everything was anonymous and there were no attempts to identify individual workers. Also, it was used for academic outcomes.
@@ -284,30 +278,6 @@ Each visual includes a short insight summarising the pattern (e.g., “Overtime 
 Design Strategy
 The dashboard was designed to balance analytical depth with clarity. Visuals are grouped in a 2×2 grid to reflect the four hypotheses. Colour consistency, font alignment, and minimal text ensure readability. The layout supports both quick scanning and deeper exploration.
 
-## Unfixed Bugs
-* Please mention unfixed bugs and why they were not fixed. This section should include shortcomings of the frameworks or technologies used. Although time can be a significant variable to consider, paucity of time and difficulty understanding implementation are not valid reasons to leave bugs unfixed.
-* Did you recognise gaps in your knowledge, and how did you address them?
-* If applicable, include evidence of feedback received (from peers or instructors) and how it improved your approach or understanding.
-
-## Development Roadmap
-* What challenges did you face, and what strategies were used to overcome these challenges?
-* What new skills or tools do you plan to learn next based on your project experience? 
-
-## Deployment
-### Heroku
-
-* The App live link is: https://YOUR_APP_NAME.herokuapp.com/ 
-* Set the runtime.txt Python version to a [Heroku-20](https://devcenter.heroku.com/articles/python-support#supported-runtimes) stack currently supported version.
-* The project was deployed to Heroku using the following steps.
-
-1. Log in to Heroku and create an App
-2. From the Deploy tab, select GitHub as the deployment method.
-3. Select your repository name and click Search. Once it is found, click Connect.
-4. Select the branch you want to deploy, then click Deploy Branch.
-5. The deployment process should happen smoothly if all deployment files are fully functional. Click now the button Open App on the top of the page to access your App.
-6. If the slug size is too large then add large files not required for the app to the .slugignore file.
-
-
 ## Main Data Analysis Libraries
 
 | Library | Purpose |
@@ -342,21 +312,8 @@ git clone https://github.com/RNB1993/Hackathon-employee-attrition-modelling.git
 pip install -r requirements.txt
 ```
 
-## Main Data Analysis Libraries
-
-| Library | Purpose |
-|---|---|
-| `pandas` | Data loading, manipulation, and tabular analysis |
-| `numpy` | Numerical operations and array handling |
-| `matplotlib` / `seaborn` | Visualisation — distributions, heatmaps, and bar charts |
-| `scikit-learn` | Machine learning — logistic regression, gradient boosting, pipelines, preprocessing, and model evaluation |
-| `pingouin` | Statistical testing — Mann-Whitney U tests across categorical variables |
-| `feature-engine` | Feature engineering — outlier capping via Winsorizer |
-
-
 ## Credits 
 IBM HR Employee Attrition dataset  https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset 
-
 
 
 
