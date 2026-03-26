@@ -77,9 +77,13 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 * List here your project hypothesis(es) and how you envision validating it (them) 
 
 ## Project Plan
-* Outline the high-level steps taken for the analysis.
-* How was the data managed throughout the collection, processing, analysis and interpretation steps?
-* Why did you choose the research methodologies you used?
+* The project was completed over four days using a structured and collaborative workflow. Regular morning meetings throughout the project ensured alignment, allowing the team to review progress, share findings, and make informed decisions on how to move forward toward completion.
+
+- Day one, roles were assigned and the dataset was selected, while the project manager created a detailed project board to organise tasks and timelines. Each team member then worked independently on their assigned responsibilities, with progress shared during scheduled meetings. 
+- Day two, exploratory data analysis (EDA) and ETL processes were completed, which informed the development of the project hypothesis. The business case summary was also defined and written, and the group collectively decided on the key outputs and visuals for the Power BI dashboard. 
+- Day three involved continued development of the dashboard and Jupyter notebooks, alongside incremental updates to the README, with group discussions guiding next steps. 
+- Day four, the focus shifted to consolidating all individual contributions and developing the final presentation slides. 
+
 
 ## The rationale to map the business requirements to the Data Visualisations
 * List your business requirements and a rationale to map them to the Data Visualisations
@@ -91,8 +95,9 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 * How did you use generative AI tools to help with ideation, design thinking and code optimisation?
 
 ## Ethical considerations
-* Were there any data privacy, bias or fairness issues with the data?
-* How did you overcome any legal or societal issues?
+* The HR Employee Attrition dataset contains information about a business’s employees, such as age, gender, education, and monthly income. Although the data is anonymised and does not include personal information, there may still be a risk of bias. Variables like gender, education level, and income may introduce routine biases and lead to unfair or discriminatory outcomes if not handled thoughtfully. But this dataset was  analysed to see the positive and negative impacts on the attrition rate, so we can give insights on how to improve retention
+The dataset was used in compliance with data protection standards (UK GDPR), ensuring that everything was anonymous and there were no attempts to identify individual workers. Also, it was used for academic outcomes.
+
 
 ## Dashboard Design
 * List all dashboard pages and their content, either blocks of information or widgets, like buttons, checkboxes, images, or any other item that your dashboard library supports.
