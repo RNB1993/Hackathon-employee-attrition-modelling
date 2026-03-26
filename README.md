@@ -154,10 +154,6 @@ These conclusions are drawn by cross-referencing outputs that were designed for 
 - Day three involved continued development of the dashboard and Jupyter notebooks, alongside incremental updates to the README, with group discussions guiding next steps. 
 - Day four, the focus shifted to consolidating all individual contributions and developing the final presentation slides. 
 
-
-## The rationale to map the business requirements to the Data Visualisations
-* List your business requirements and a rationale to map them to the Data Visualisations
-
 ## Feature Importance: Business Insights
 
 The model suggests that employee attrition is influenced by a combination of direct employee characteristics and more complex interactions between features. This indicates that attrition risk is not driven by one factor alone, but by how multiple factors combine in practice.
