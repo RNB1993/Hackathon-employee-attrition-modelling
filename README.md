@@ -131,6 +131,57 @@ These conclusions are drawn by cross-referencing outputs that were designed for 
 ## The rationale to map the business requirements to the Data Visualisations
 * List your business requirements and a rationale to map them to the Data Visualisations
 
+## Feature Importance: Business Insights
+
+The model suggests that employee attrition is influenced by a combination of direct employee characteristics and more complex interactions between features. This indicates that attrition risk is not driven by one factor alone, but by how multiple factors combine in practice.
+
+### Key Business Insights
+
+#### 1. Frequent business travel is the strongest attrition risk factor
+The most influential positive driver of attrition was **frequent business travel**. Employees who travel regularly appear to be at a much higher risk of leaving the organisation than those with less demanding travel requirements.
+
+**Business implication:**  
+This suggests that travel-heavy roles may require additional retention support, such as workload reviews, wellbeing check-ins, greater flexibility, or clearer progression incentives.
+
+#### 2. Some education backgrounds show higher attrition risk
+Certain education field categories, particularly **Technical Degree**, were associated with a higher likelihood of attrition in the model.
+
+**Business implication:**  
+This may indicate that employees from specific educational backgrounds have different expectations around career growth, role fit, or mobility. These groups may benefit from more targeted development and progression planning.
+
+#### 3. Overtime patterns appear closely linked to retention
+The model found that **not working overtime** was one of the strongest indicators associated with employees staying, which implies that employees working overtime may face a greater risk of attrition.
+
+**Business implication:**  
+This may reflect pressure, workload imbalance, or burnout risk. It suggests that overtime should be monitored carefully as a possible retention warning sign rather than treated purely as a productivity measure.
+
+#### 4. Some departments and roles appear more stable
+Employees in **Research & Development** and certain roles such as **Research Scientist** were associated with lower attrition risk.
+
+**Business implication:**  
+These areas may offer working conditions, role clarity, or progression pathways that support retention more effectively. This could provide a useful benchmark when reviewing teams with higher turnover.
+
+#### 5. The model benefited from feature engineering
+A large number of engineered interaction features were among the most influential predictors. This shows that attrition risk is affected not only by individual variables, but also by the way factors combine and interact.
+
+**Business implication:**  
+This strengthens the case for using data-led modelling rather than relying only on simple single-factor analysis. Employee turnover is likely shaped by overlapping pressures rather than isolated causes.
+
+---
+
+## Summary
+
+Overall, the model indicates that attrition is most strongly associated with **frequent travel demands, overtime-related patterns, and certain employee background characteristics**, while some departments and roles appear more protective. The results also show that **interaction effects matter**, meaning the relationship between employee conditions is often more informative than looking at features in isolation.
+
+From a business perspective, these findings suggest that retention strategies should focus on:
+
+- employees in travel-heavy roles  
+- teams or individuals with sustained overtime patterns  
+- employee groups with elevated risk profiles based on education or role context  
+- understanding how multiple workplace factors combine to influence turnover  
+
+It is important to note that these feature importance results show **model associations rather than proof of causation**, but they provide a strong basis for further HR investigation and targeted retention planning.
+
 ## Analysis techniques used
 * List the data analysis methods used and explain limitations or alternative approaches.
 * How did you structure the data analysis techniques. Justify your response.
