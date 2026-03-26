@@ -74,7 +74,54 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 
 
 ## Hypothesis and how to validate?
-* List here your project hypothesis(es) and how you envision validating it (them) 
+
+> **Note:** Conclusions are preliminary due to time constraints and should be validated with further dedicated analysis.
+
+The notebooks in this repository (`EDA.ipynb`, `Stats_Tests.ipynb`, `Feature_engineering.ipynb`) were not built to test these four hypotheses directly — they were built for data cleaning, statistical screening, and predictive modelling. However, by reading across the outputs produced, we can draw preliminary conclusions sufficient to provide a reasonable directional steer on each hypothesis.
+
+### H1 — Does overtime impact attrition?
+
+**Preliminary Conclusion:** Yes — and the effect is strong. But the expected direction is wrong.
+
+The `Stats_Tests` notebook ran Mann-Whitney U tests across all categorical variables, and `OverTime` was one of only two variables to return statistically significant results. Reinforcing this, the modelling notebook identified `OverTime_No` as the single most influential predictor in the entire model. The weight of evidence is clear: **overtime workers are more likely to leave, not less.** The original hypothesis had the direction inverted.
+
+> **Confidence: High** — supported by both independent statistical testing and the predictive model.
+
+---
+
+### H2 — Does frequent travel increase attrition?
+
+**Preliminary Conclusion:** Yes — this is the most clearly confirmed hypothesis.
+
+While the `Stats_Tests` notebook did not isolate a specific travel vs. attrition test, the modelling notebook provides strong indirect evidence. `BusinessTravel_Travel_Frequently` ranked as the second most impactful feature in the model, with a positive coefficient indicating employees who travel frequently are approximately **1.88× more likely to leave** once other factors are accounted for. The project's own executive summary calls out travel-heavy roles as the top retention risk.
+
+> **Confidence: High** — the model evidence is direct and consistent.
+
+---
+
+### H3 — Do employees with technical degrees have higher attrition?
+
+**Preliminary Conclusion:** Possibly — but the evidence is thin and inconclusive.
+
+`EducationField_Technical Degree` appeared in the top 20 most important features in the model with a positive coefficient, pointing toward higher attrition risk. However, the statistical testing notebook found no significant result when education field was tested as a grouping variable. These two pieces of evidence pull in different directions, and given no dedicated test was run specifically for this hypothesis, no firm conclusion can be drawn from what is here.
+
+> **Confidence: Low** — treat as a hypothesis worth properly testing, not a confirmed finding.
+
+---
+
+### H4 — Does gender influence attrition rates?
+
+**Preliminary Conclusion:** No meaningful evidence to support this.
+
+The `Stats_Tests` notebook ran 46 Mann-Whitney U tests using `Gender` as the grouping variable and returned **zero significant results**. Gender did appear in the model's top 20 features, but as a weak *protective* factor (women slightly less likely to leave) — the opposite of the typical assumption behind this hypothesis. On the evidence available, gender does not appear to be a meaningful driver of attrition in this dataset.
+
+> **Confidence: Moderate** — statistical tests are clear, though a dedicated chi-square test on gender vs. attrition would formally close this out.
+
+---
+
+### Note on Methodology
+
+These conclusions are drawn by cross-referencing outputs that were designed for other purposes — not from tests built specifically to answer these questions. A more rigorous investigation would dedicate a targeted analysis to each hypothesis. The data and tooling to do this properly is already in place in this repo, so the remaining work is focused analysis rather than starting from scratch.
 
 ## Project Plan
 * Outline the high-level steps taken for the analysis.
@@ -125,7 +172,15 @@ These hypotheses are tested through exploratory data analysis and visualisation.
 
 
 ## Main Data Analysis Libraries
-* Here you should list the libraries you used in the project and provide an example(s) of how you used these libraries.
+
+| Library | Purpose |
+|---|---|
+| `pandas` | Data loading, manipulation, and tabular analysis |
+| `numpy` | Numerical operations and array handling |
+| `matplotlib` / `seaborn` | Visualisation — distributions, heatmaps, and bar charts |
+| `scikit-learn` | Machine learning — logistic regression, gradient boosting, pipelines, preprocessing, and model evaluation |
+| `pingouin` | Statistical testing — Mann-Whitney U tests across categorical variables |
+| `feature-engine` | Feature engineering — outlier capping via Winsorizer |
 
 
 ## Credits 
