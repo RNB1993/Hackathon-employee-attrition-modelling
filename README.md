@@ -244,31 +244,69 @@ The dataset was used in compliance with data protection standards (UK GDPR), ens
 
 
 ## Dashboard Design
-* List all dashboard pages and their content, either blocks of information or widgets, like buttons, checkboxes, images, or any other item that your dashboard library supports.
-* Later, during the project development, you may revisit your dashboard plan to update a given feature (for example, at the beginning of the project you were confident you would use a given plot to display an insight but subsequently you used another plot type).
-* How were data insights communicated to technical and non-technical audiences?
-* Explain how the dashboard was designed to communicate complex data insights to different audiences. 
+## Dashboard Screenshot
+
+![Employee Attrition Dashboard](images/dashboard.png)
+
+This single-page Power BI dashboard was designed to test four hypotheses related to employee attrition. It includes the following components:
+Widgets and Layout
+
+KPI Cards:
+Total Employees
+Attrition Count
+Attrition Rate
+
+Slicers:
+Department
+Job Level
+Age Band
+
+Visual Blocks:
+Bar chart: Attrition Rate by Overtime
+Bar chart: Attrition Rate by Business Travel
+Bar chart: Attrition Rate by Education Field
+Bar chart: Attrition Rate by Gender
+
+Text Blocks:
+Key Findings
+Recommendations
+Summary paragraph
+
+Design Evolution
+Initially, clustered column charts were planned for all visuals. During development, bar charts were used instead to improve readability and visual hierarchy. The slicer panel was added later to support interactive filtering across departments and job levels.
+
+Communicating Insights to Technical and Non-Technical Audiences
+Technical audience:
+The dashboard includes precise attrition rates, segmented by categorical variables. Slicers allow analysts to drill down into specific employee groups. Tooltips and KPI cards provide quick access to key metrics.
+Non-technical audience:
+Each visual includes a short insight summarising the pattern (e.g., “Overtime employees leave at nearly 3× the rate of non-overtime employees”). Recommendations are written in plain language to support HR decision-making.
+
+Design Strategy
+The dashboard was designed to balance analytical depth with clarity. Visuals are grouped in a 2×2 grid to reflect the four hypotheses. Colour consistency, font alignment, and minimal text ensure readability. The layout supports both quick scanning and deeper exploration.
 
 ## Unfixed Bugs
-At the current stage of the project, there are no major known bugs that prevent the main workflow from running as intended. The notebooks are separated by stage and the core outputs are saved into structured folders for reuse.
+* Please mention unfixed bugs and why they were not fixed. This section should include shortcomings of the frameworks or technologies used. Although time can be a significant variable to consider, paucity of time and difficulty understanding implementation are not valid reasons to leave bugs unfixed.
+* Did you recognise gaps in your knowledge, and how did you address them?
+* If applicable, include evidence of feedback received (from peers or instructors) and how it improved your approach or understanding.
 
 ## Development Roadmap
-
-* Time issues 
-* Conflicts over interviews, asessments during day 3 and day 5
-* First time working on a project as a group. 
-* Spent a long time working out roles and duties. 
+* What challenges did you face, and what strategies were used to overcome these challenges?
+* What new skills or tools do you plan to learn next based on your project experience? 
 
 ## Deployment
+### Heroku
 
-### Clone the repo
-```bash
-git clone https://github.com/RNB1993/Hackathon-employee-attrition-modelling.git
-```
-#### Install dependencies
-```bash
-pip install -r requirements.txt
-```
+* The App live link is: https://YOUR_APP_NAME.herokuapp.com/ 
+* Set the runtime.txt Python version to a [Heroku-20](https://devcenter.heroku.com/articles/python-support#supported-runtimes) stack currently supported version.
+* The project was deployed to Heroku using the following steps.
+
+1. Log in to Heroku and create an App
+2. From the Deploy tab, select GitHub as the deployment method.
+3. Select your repository name and click Search. Once it is found, click Connect.
+4. Select the branch you want to deploy, then click Deploy Branch.
+5. The deployment process should happen smoothly if all deployment files are fully functional. Click now the button Open App on the top of the page to access your App.
+6. If the slug size is too large then add large files not required for the app to the .slugignore file.
+
 
 ## Main Data Analysis Libraries
 
@@ -283,10 +321,22 @@ pip install -r requirements.txt
 
 
 ## Credits 
-IBM HR Employee Attrition dataset  https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset 
+
+* In this section, you need to reference where you got your content, media and extra help from. It is common practice to use code from other repositories and tutorials, however, it is important to be very specific about these sources to avoid plagiarism. 
+* You can break the credits section up into Content and Media, depending on what you have included in your project. 
+
+### Content 
+
+- The text for the Home page was taken from Wikipedia Article A
+- Instructions on how to implement form validation on the Sign-Up page was taken from [Specific YouTube Tutorial](https://www.youtube.com/)
+- The icons in the footer were taken from [Font Awesome](https://fontawesome.com/)
+
+### Media
+
+- The photos used on the home and sign-up page are from This Open-Source site
+- The images used for the gallery page were taken from this other open-source site
 
 
 
-
-## Acknowledgements
-* Thanks to the instructors (Vasi, Mark, and Neil), walkthrough materials, and feedback sources that supported the development of this project, as well as the broader learning content that helped shape the analytical and ethical approach used throughout.
+## Acknowledgements (optional)
+* Thank the people who provided support through this project.
