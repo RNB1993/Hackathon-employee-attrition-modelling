@@ -1,0 +1,28 @@
+Top 25 interaction features (by |coef|) mapped to raw feature pairs
+(rank, interaction, coef, odds_ratio, direction, type, raw_feature_1, raw_feature_2, spearman_r)
+
+1	inter_pos_119	+0.3442	1.41	increases_attrition	pos:(f1/f2)*r	DistanceFromHome	YearsAtCompany	0.011119
+2	inter_pos_025	+0.3427	1.41	increases_attrition	pos:(f1/f2)*r	NumCompaniesWorked	TotalWorkingYears	0.315512
+3	inter_pos_161	-0.3264	0.72	decreases_attrition	pos:(f1/f2)*r	JobSatisfaction	YearsInCurrentRole	0.000479
+4	inter_pos_002	+0.2516	1.29	increases_attrition	pos:(f1/f2)*r	YearsAtCompany	YearsInCurrentRole	0.854517
+5	inter_pos_073	-0.2428	0.78	decreases_attrition	pos:(f1/f2)*r	NumCompaniesWorked	StockOptionLevel	0.032277
+6	inter_pos_037	+0.2352	1.27	increases_attrition	pos:(f1/f2)*r	Education	MonthlyIncome	0.119805
+7	inter_pos_081	+0.2336	1.26	increases_attrition	pos:(f1/f2)*r	EnvironmentSatisfaction	WorkLifeBalance	0.027169
+8	inter_pos_113	+0.2292	1.26	increases_attrition	pos:(f1/f2)*r	JobSatisfaction	StockOptionLevel	0.012785
+9	inter_neg_039	+0.2153	1.24	increases_attrition	neg:(f1*f2)*r	DailyRate	TrainingTimesLastYear	-0.012206
+10	inter_neg_094	+0.2149	1.24	increases_attrition	neg:(f1*f2)*r	MonthlyRate	StockOptionLevel	-0.037274
+11	inter_pos_123	+0.2124	1.24	increases_attrition	pos:(f1/f2)*r	Age	EnvironmentSatisfaction	0.009820
+12	inter_neg_106	-0.1841	0.83	decreases_attrition	neg:(f1*f2)*r	NumCompaniesWorked	YearsSinceLastPromotion	-0.068175
+13	inter_neg_041	+0.1824	1.20	increases_attrition	neg:(f1*f2)*r	EnvironmentSatisfaction	TrainingTimesLastYear	-0.012727
+14	inter_neg_038	+0.1822	1.20	increases_attrition	neg:(f1*f2)*r	JobInvolvement	JobSatisfaction	-0.012148
+15	inter_neg_018	+0.1701	1.19	increases_attrition	neg:(f1*f2)*r	DailyRate	YearsWithCurrManager	-0.004716
+16	inter_pos_110	-0.1656	0.85	decreases_attrition	pos:(f1/f2)*r	Education	StockOptionLevel	0.013794
+17	inter_neg_010	-0.1608	0.85	decreases_attrition	neg:(f1*f2)*r	JobSatisfaction	MonthlyRate	-0.002702
+18	inter_pos_164	-0.1585	0.85	decreases_attrition	pos:(f1/f2)*r	Age	PerformanceRating	0.000093
+19	inter_pos_127	-0.1580	0.85	decreases_attrition	pos:(f1/f2)*r	EnvironmentSatisfaction	YearsAtCompany	0.008352
+20	inter_neg_098	-0.1516	0.86	decreases_attrition	neg:(f1*f2)*r	NumCompaniesWorked	TrainingTimesLastYear	-0.047960
+21	inter_neg_034	+0.1482	1.16	increases_attrition	neg:(f1*f2)*r	TrainingTimesLastYear	YearsWithCurrManager	-0.010193
+22	inter_pos_124	+0.1473	1.16	increases_attrition	pos:(f1/f2)*r	DailyRate	RelationshipSatisfaction	0.009685
+23	inter_pos_116	+0.1450	1.16	increases_attrition	pos:(f1/f2)*r	PerformanceRating	TotalWorkingYears	0.011434
+24	inter_neg_072	+0.1382	1.15	increases_attrition	neg:(f1*f2)*r	JobInvolvement	PerformanceRating	-0.024733
+25	inter_neg_052	+0.1283	1.14	increases_attrition	neg:(f1*f2)*r	EnvironmentSatisfaction	MonthlyIncome	-0.015516
