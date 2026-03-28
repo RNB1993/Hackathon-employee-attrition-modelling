@@ -44,19 +44,33 @@ Tip: use **color** + facets for quick stratified inspection before modeling.
     audience=audience,
 )
 
-with st.sidebar:
-    st.header("Controls")
-    target = st.selectbox("Target column", options=[c for c in df.columns if c.lower() == "attrition"] or df.columns)
+all_cols = df.columns.tolist()
+numeric_cols = df.select_dtypes("number").columns.tolist()
+categorical_cols = [c for c in all_cols if c not in numeric_cols]
+
+st.subheader("Chart controls")
+st.caption(
+    "Controls are shown here (not only in the sidebar) so they're visible across all audience levels. "
+    "Use Color + Facets to group and compare segments."
+)
+
+c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.3, 1.3])
+with c1:
     plot_kind = st.radio("Plot", ["Univariate", "Bivariate"], horizontal=True)
-
-    all_cols = df.columns.tolist()
-    numeric_cols = df.select_dtypes("number").columns.tolist()
-    categorical_cols = [c for c in all_cols if c not in numeric_cols]
-
+with c2:
+    # Optional, used mainly for hover / defaults
+    target_candidates = [c for c in df.columns if c.lower() == "attrition"]
+    target_default = target_candidates[0] if target_candidates else all_cols[0]
+    target = st.selectbox("Target (optional)", options=all_cols, index=all_cols.index(target_default))
+with c3:
     color = st.selectbox("Hue / Color", options=[None] + all_cols, index=0)
-    facet_row = st.selectbox("Facet row", options=[None] + categorical_cols, index=0)
+with c4:
     facet_col = st.selectbox("Facet col", options=[None] + categorical_cols, index=0)
 
+c5, c6 = st.columns([1.3, 1.3])
+with c5:
+    facet_row = st.selectbox("Facet row", options=[None] + categorical_cols, index=0)
+with c6:
     st.caption("Tip: facets work best with categorical columns.")
 
 if plot_kind == "Univariate":
@@ -117,6 +131,10 @@ else:
         y_candidates = [c for c in all_cols if c != x]
         y = st.selectbox("Y", options=y_candidates, index=0)
         chart = st.selectbox("Chart", options=["Scatter", "Box", "Bar"], index=0)
+        st.caption(
+            "Scatter works best for numeric-numeric; Box is great for categorical vs numeric; "
+            "Bar aggregates by group (e.g., mean of Y by X)."
+        )
 
     with right:
         if chart == "Scatter":

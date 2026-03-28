@@ -181,6 +181,7 @@ def engineer_interactions(
 
     engineered = df.copy()
     used_original_features: set[str] = set()
+    new_cols: dict[str, pd.Series] = {}
 
     # Build pos and neg in the same order as mapping
     for row in mapping.itertuples(index=False):
@@ -195,11 +196,14 @@ def engineer_interactions(
             )
 
         if row.kind == "pos":
-            engineered[inter] = _safe_divide(engineered[f1], engineered[f2]) * r
+            new_cols[inter] = _safe_divide(engineered[f1], engineered[f2]) * r
         else:
-            engineered[inter] = (engineered[f1] * engineered[f2]) * r
+            new_cols[inter] = (engineered[f1] * engineered[f2]) * r
 
         used_original_features.update([f1, f2])
+
+    if new_cols:
+        engineered = pd.concat([engineered, pd.DataFrame(new_cols, index=engineered.index)], axis=1)
 
     # Drop original numeric features used in engineering, keep target if present
     drop_original = [c for c in sorted(used_original_features) if c in engineered.columns]
@@ -219,7 +223,28 @@ def load_pipeline(model_label: str):
         raise FileNotFoundError(f"Model file not found: {path}")
 
     with open(path, "rb") as f:
-        return pickle.load(f)
+        obj = pickle.load(f)
+
+    # Some training notebooks persist a dict wrapper (e.g., metadata + model).
+    # Normalize to an object that exposes `predict_proba`.
+    if isinstance(obj, dict):
+        # Common keys first
+        for key in ("pipeline", "model", "estimator", "clf", "classifier"):
+            candidate = obj.get(key)
+            if hasattr(candidate, "predict_proba"):
+                return candidate
+
+        # Otherwise, return the first value that looks like an estimator.
+        for candidate in obj.values():
+            if hasattr(candidate, "predict_proba"):
+                return candidate
+
+        raise TypeError(
+            "Loaded model pickle is a dict but no value exposes 'predict_proba'. "
+            f"Available keys: {sorted(obj.keys())}"
+        )
+
+    return obj
 
 
 def predict_proba_attrition(
@@ -247,6 +272,12 @@ def predict_proba_attrition(
 
     if target_col in X.columns:
         X = X.drop(columns=[target_col])
+
+    if not hasattr(pipe, "predict_proba"):
+        raise TypeError(
+            "Loaded model does not support predict_proba. "
+            f"Loaded type: {type(pipe)!r}"
+        )
 
     proba = pipe.predict_proba(X)[:, 1]
     out = df_raw.copy()
