@@ -4,16 +4,20 @@ import plotly.express as px
 import streamlit as st
 
 from dashboard_utils import (
+    apply_app_theme,
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
     load_cleaned_dataset,
     render_audience_markdown,
+    theme_selector,
 )
 
 st.set_page_config(page_title="EDA", layout="wide")
 
-configure_plotly_theme()
+theme_mode = theme_selector()
+apply_app_theme(theme_mode)
+configure_plotly_theme(theme_mode)
 
 st.title("EDA — Univariate & Bivariate (Plotly)")
 
@@ -131,6 +135,9 @@ else:
         y_candidates = [c for c in all_cols if c != x]
         y = st.selectbox("Y", options=y_candidates, index=0)
         chart = st.selectbox("Chart", options=["Scatter", "Box", "Bar"], index=0)
+        trendline = "None"
+        if chart == "Scatter" and x in numeric_cols and y in numeric_cols:
+            trendline = st.selectbox("Trendline", options=["None", "OLS", "LOWESS"], index=0)
         st.caption(
             "Scatter works best for numeric-numeric; Box is great for categorical vs numeric; "
             "Bar aggregates by group (e.g., mean of Y by X)."
@@ -138,6 +145,12 @@ else:
 
     with right:
         if chart == "Scatter":
+            trend = None
+            if trendline == "OLS":
+                trend = "ols"
+            elif trendline == "LOWESS":
+                trend = "lowess"
+
             fig = px.scatter(
                 df,
                 x=x,
@@ -146,6 +159,7 @@ else:
                 facet_row=facet_row,
                 facet_col=facet_col,
                 hover_data=[target] if target in df.columns else None,
+                trendline=trend,
             )
         elif chart == "Box":
             fig = px.box(

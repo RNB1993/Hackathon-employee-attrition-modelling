@@ -1,7 +1,13 @@
 
 import streamlit as st
 
-from dashboard_utils import audience_selector, configure_plotly_theme, render_audience_markdown
+from dashboard_utils import (
+    apply_app_theme,
+    audience_selector,
+    configure_plotly_theme,
+    render_audience_markdown,
+    theme_selector,
+)
 
 st.set_page_config(
     page_title="IBM HR Attrition Dashboard",
@@ -9,7 +15,9 @@ st.set_page_config(
     layout="wide",
 )
 
-configure_plotly_theme()
+theme_mode = theme_selector()
+apply_app_theme(theme_mode)
+configure_plotly_theme(theme_mode)
 
 st.title("IBM HR Analytics — Attrition Dashboard")
 
@@ -38,24 +46,19 @@ Multi-page Streamlit dashboard for IBM HR attrition analytics.
 Streamlit front-end on top of pandas + plotly + sklearn pipelines.
 
 Pages include EDA, statistical tests, feature engineering (interaction mapping), and prediction with scenario analysis + exports.
-""",
-    },
-    audience=audience,
-)
-
-st.markdown(
-    """
-This is a multi-page Streamlit dashboard built from the EDA, statistical tests, and feature engineering work.
 
 Use the left sidebar (or the Pages menu) to navigate:
 - **EDA (Plotly)**: univariate + bivariate interactive charts (color/hue, facet rows/cols)
 - **Stats**: quick hypothesis tests and association metrics
 - **Feature Engineering**: correlations + engineered interactions overview
 - **Prediction**: load the saved model pipelines and predict attrition probability
-"""
+""",
+    },
+    audience=audience,
 )
 
-st.info(
-    "If you deployed with the existing `Procfile`, it runs `streamlit run app.py`. "
-    "The pages are in the `pages/` folder."
-)
+with st.expander("Deployment notes", expanded=False):
+    st.markdown(
+        "If you deployed with the existing `Procfile`, it runs `streamlit run app.py`. "
+        "The pages are in the `pages/` folder."
+    )

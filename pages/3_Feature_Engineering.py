@@ -4,6 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 from dashboard_utils import (
+    apply_app_theme,
     audience_selector,
     configure_plotly_theme,
     correlation_pairs,
@@ -13,11 +14,14 @@ from dashboard_utils import (
     load_cleaned_dataset,
     numeric_df,
     render_audience_markdown,
+    theme_selector,
 )
 
 st.set_page_config(page_title="Feature Engineering", layout="wide")
 
-configure_plotly_theme()
+theme_mode = theme_selector()
+apply_app_theme(theme_mode)
+configure_plotly_theme(theme_mode)
 
 st.title("Feature Engineering — Correlations & Interactions")
 
