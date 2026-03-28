@@ -3,11 +3,14 @@ from __future__ import annotations
 import math
 import pickle
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import plotly.io as pio
+import plotly.graph_objects as go
 
 try:
     import streamlit as st
@@ -283,3 +286,136 @@ def interaction_importance_table(
 def ensure_required_columns(df: pd.DataFrame, required: Iterable[str]) -> list[str]:
     missing = [c for c in required if c not in df.columns]
     return missing
+
+
+AUDIENCE_OPTIONS = ["Non-technical", "Semi-technical", "Technical"]
+
+
+PLOTLY_THEME_NAME = "dark_green"
+
+
+def configure_plotly_theme() -> None:
+    """Configure Plotly defaults to match the app's dark-green Streamlit theme."""
+
+    # Idempotent: safe to call from multiple pages.
+    if PLOTLY_THEME_NAME in pio.templates:
+        pio.templates.default = PLOTLY_THEME_NAME
+        return
+
+    base = pio.templates["plotly_dark"] if "plotly_dark" in pio.templates else None
+    overlay = go.layout.Template(
+        layout=go.Layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#E8F5E9"),
+            colorway=[
+                "#2ECC71",
+                "#27AE60",
+                "#A3E4D7",
+                "#58D68D",
+                "#1E8449",
+                "#52BE80",
+            ],
+            xaxis=dict(
+                gridcolor="rgba(232,245,233,0.12)",
+                zerolinecolor="rgba(232,245,233,0.20)",
+                linecolor="rgba(232,245,233,0.25)",
+            ),
+            yaxis=dict(
+                gridcolor="rgba(232,245,233,0.12)",
+                zerolinecolor="rgba(232,245,233,0.20)",
+                linecolor="rgba(232,245,233,0.25)",
+            ),
+            legend=dict(
+                bgcolor="rgba(16,42,29,0.35)",
+                bordercolor="rgba(232,245,233,0.10)",
+                borderwidth=1,
+            ),
+            margin=dict(l=10, r=10, t=40, b=10),
+        )
+    )
+
+    pio.templates[PLOTLY_THEME_NAME] = base + overlay if base is not None else overlay
+    pio.templates.default = PLOTLY_THEME_NAME
+
+
+def audience_selector(*, default: str = "Semi-technical") -> str:
+    """Persistent audience selector for all pages.
+
+    Stores selection in st.session_state["audience"]. If Streamlit is not available,
+    returns the default.
+    """
+
+    if st is None:
+        return default
+
+    if default not in AUDIENCE_OPTIONS:
+        default = "Semi-technical"
+
+    if "audience" not in st.session_state:
+        st.session_state["audience"] = default
+
+    # Render in sidebar; keep consistent across pages
+    idx = AUDIENCE_OPTIONS.index(st.session_state["audience"])
+    choice = st.sidebar.radio("Audience", options=AUDIENCE_OPTIONS, index=idx)
+    st.session_state["audience"] = choice
+    return choice
+
+
+def render_audience_markdown(blocks: dict[str, str], *, audience: str) -> None:
+    """Render the markdown for the current audience.
+
+    `blocks` should have keys matching AUDIENCE_OPTIONS.
+    """
+
+    if st is None:
+        return
+
+    md = blocks.get(audience) or blocks.get("Semi-technical") or next(iter(blocks.values()), "")
+    if md:
+        st.markdown(md)
+
+
+def dataframe_to_excel_bytes(df: pd.DataFrame, *, sheet_name: str = "data") -> bytes:
+    """Convert a dataframe to an .xlsx file (as bytes) for download."""
+
+    bio = BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name[:31] or "data")
+    return bio.getvalue()
+
+
+def download_dataframe(
+    df: pd.DataFrame,
+    *,
+    file_stem: str,
+    label: str = "Download",
+    csv_kwargs: dict | None = None,
+    excel_sheet_name: str = "data",
+) -> None:
+    """Render CSV + Excel download buttons for a dataframe."""
+
+    if st is None:
+        return
+
+    csv_kwargs = csv_kwargs or {}
+    csv_bytes = df.to_csv(index=False, **csv_kwargs).encode("utf-8")
+    xlsx_bytes = dataframe_to_excel_bytes(df, sheet_name=excel_sheet_name)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            f"{label} CSV",
+            data=csv_bytes,
+            file_name=f"{file_stem}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            f"{label} Excel",
+            data=xlsx_bytes,
+            file_name=f"{file_stem}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )

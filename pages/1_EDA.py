@@ -1,16 +1,48 @@
 from __future__ import annotations
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from dashboard_utils import load_cleaned_dataset
+from dashboard_utils import (
+    audience_selector,
+    configure_plotly_theme,
+    download_dataframe,
+    load_cleaned_dataset,
+    render_audience_markdown,
+)
 
 st.set_page_config(page_title="EDA", layout="wide")
+
+configure_plotly_theme()
 
 st.title("EDA — Univariate & Bivariate (Plotly)")
 
 df = load_cleaned_dataset()
+
+audience = audience_selector()
+
+render_audience_markdown(
+    {
+        "Non-technical": """
+This page helps you *visually explore* patterns in the HR dataset.
+
+- Use **Univariate** to see how one field is distributed.
+- Use **Bivariate** to compare two fields (e.g., a factor vs attrition).
+""",
+        "Semi-technical": """
+Use this page for interactive exploratory data analysis (EDA) with Plotly.
+
+- Choose a column for **Univariate** distribution plots
+- Use **Bivariate** to explore relationships and potential predictors
+""",
+        "Technical": """
+Interactive EDA with Plotly (hist/box/violin/scatter) and optional facets.
+
+Tip: use **color** + facets for quick stratified inspection before modeling.
+""",
+    },
+    audience=audience,
+)
 
 with st.sidebar:
     st.header("Controls")
@@ -121,3 +153,6 @@ else:
 
 st.subheader("Dataset preview")
 st.dataframe(df.head(20), use_container_width=True)
+
+st.subheader("Download dataset")
+download_dataframe(df, file_stem="hr_attrition_cleaned", label="Download dataset")

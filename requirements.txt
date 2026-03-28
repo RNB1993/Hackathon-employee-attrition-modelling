@@ -23,6 +23,9 @@ tabulate==0.10.0
 threadpoolctl==3.6.0
 xarray==2026.2.0
 
+# Export helpers
+openpyxl==3.1.5
+
 # Dashboard
 plotly==6.0.0
 streamlit==1.43.2

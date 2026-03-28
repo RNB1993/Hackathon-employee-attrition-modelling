@@ -6,13 +6,46 @@ import plotly.express as px
 import streamlit as st
 from scipy import stats
 
-from dashboard_utils import load_cleaned_dataset
+from dashboard_utils import (
+    audience_selector,
+    configure_plotly_theme,
+    download_dataframe,
+    load_cleaned_dataset,
+    render_audience_markdown,
+)
 
 st.set_page_config(page_title="Stats", layout="wide")
+
+configure_plotly_theme()
 
 st.title("Stats — Quick Tests")
 
 df = load_cleaned_dataset()
+
+audience = audience_selector()
+
+render_audience_markdown(
+    {
+        "Non-technical": """
+This page runs simple checks to see whether a factor differs between employees who **left** vs **stayed**.
+
+Use it to support discussion—not as a final decision tool.
+""",
+        "Semi-technical": """
+Quick hypothesis tests / association checks.
+
+- Numeric vs target: Welch t-test and Mann–Whitney
+- Categorical vs target: Chi-square + Cramér’s V
+""",
+        "Technical": """
+Stat testing page.
+
+Numeric: Welch t-test + Mann–Whitney; Categorical: Chi-square + Cramér’s V.
+Assumption checks shown for context.
+""",
+    },
+    audience=audience,
+)
 
 # Normalize target to binary 0/1
 if "Attrition" in df.columns and df["Attrition"].dtype == object:
@@ -69,15 +102,21 @@ if test_kind.startswith("Numeric"):
     except Exception:
         mw_p = None
 
-    st.write(
-        {
-            "welch_ttest_stat": float(t_res.statistic),
-            "welch_ttest_p": float(t_res.pvalue),
-            "mann_whitney_p": mw_p,
-            "mean_group0": float(g0.mean()) if len(g0) else None,
-            "mean_group1": float(g1.mean()) if len(g1) else None,
-        }
-    )
+    results = {
+        "welch_ttest_stat": float(t_res.statistic),
+        "welch_ttest_p": float(t_res.pvalue),
+        "mann_whitney_p": mw_p,
+        "mean_group0": float(g0.mean()) if len(g0) else None,
+        "mean_group1": float(g1.mean()) if len(g1) else None,
+        "n_group0": int(len(g0)),
+        "n_group1": int(len(g1)),
+        "column": col,
+        "target_col": target_col,
+    }
+    st.write(results)
+
+    st.subheader("Download")
+    download_dataframe(pd.DataFrame([results]), file_stem="stats_numeric_results", label="Download results")
 
 else:
     cat = st.selectbox("Categorical column", options=[c for c in cat_cols if c != target_col])
@@ -94,15 +133,20 @@ else:
     st.subheader("Contingency table")
     st.dataframe(ct, use_container_width=True)
 
+    st.subheader("Download")
+    download_dataframe(ct.reset_index(), file_stem="stats_contingency_table", label="Download contingency")
+
     st.subheader("Chi-square results")
-    st.write(
-        {
-            "chi2": float(chi2),
-            "p_value": float(p),
-            "dof": int(dof),
-            "cramers_v": float(cramers_v),
-        }
-    )
+    chi_results = {
+        "chi2": float(chi2),
+        "p_value": float(p),
+        "dof": int(dof),
+        "cramers_v": float(cramers_v),
+        "categorical_col": cat,
+        "target_col": target_col,
+    }
+    st.write(chi_results)
+    download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
 
     st.subheader("Bar chart")
     plot_df = ct.reset_index().melt(id_vars=cat, var_name=target_col, value_name="count")
