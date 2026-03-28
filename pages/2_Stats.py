@@ -7,16 +7,20 @@ import streamlit as st
 from scipy import stats
 
 from dashboard_utils import (
+    apply_app_theme,
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
     load_cleaned_dataset,
     render_audience_markdown,
+    theme_selector,
 )
 
 st.set_page_config(page_title="Stats", layout="wide")
 
-configure_plotly_theme()
+theme_mode = theme_selector()
+apply_app_theme(theme_mode)
+configure_plotly_theme(theme_mode)
 
 st.title("Stats — Quick Tests")
 

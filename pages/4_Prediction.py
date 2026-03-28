@@ -8,6 +8,7 @@ import streamlit as st
 
 from dashboard_utils import (
     MODEL_CANDIDATES,
+    apply_app_theme,
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
@@ -18,11 +19,14 @@ from dashboard_utils import (
     load_pipeline,
     predict_proba_attrition,
     render_audience_markdown,
+    theme_selector,
 )
 
 st.set_page_config(page_title="Prediction", layout="wide")
 
-configure_plotly_theme()
+theme_mode = theme_selector()
+apply_app_theme(theme_mode)
+configure_plotly_theme(theme_mode)
 
 st.title("Prediction — Attrition Probability")
 

@@ -343,57 +343,198 @@ def ensure_required_columns(df: pd.DataFrame, required: Iterable[str]) -> list[s
 AUDIENCE_OPTIONS = ["Non-technical", "Semi-technical", "Technical"]
 
 
+THEME_OPTIONS = ["Dark", "Light"]
+
+
 PLOTLY_THEME_NAME = "dark_green"
+PLOTLY_THEME_LIGHT_NAME = "light_green"
 
 
-def configure_plotly_theme() -> None:
-    """Configure Plotly defaults to match the app's dark-green Streamlit theme."""
+def theme_selector(*, default: str = "Dark") -> str:
+        """Persistent theme selector for all pages.
 
-    # Idempotent: safe to call from multiple pages.
-    if PLOTLY_THEME_NAME in pio.templates:
-        pio.templates.default = PLOTLY_THEME_NAME
-        return
+        Notes:
+        - Streamlit's built-in theme (config.toml) is static at startup.
+        - This selector applies a lightweight CSS override plus Plotly templates.
+        """
 
-    base = pio.templates["plotly_dark"] if "plotly_dark" in pio.templates else None
-    overlay = go.layout.Template(
-        layout=go.Layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#E8F5E9"),
-            colorway=[
-                "#2ECC71",
-                "#27AE60",
-                "#A3E4D7",
-                "#58D68D",
-                "#1E8449",
-                "#52BE80",
-            ],
-            xaxis=dict(
-                gridcolor="rgba(232,245,233,0.12)",
-                zerolinecolor="rgba(232,245,233,0.20)",
-                linecolor="rgba(232,245,233,0.25)",
-            ),
-            yaxis=dict(
-                gridcolor="rgba(232,245,233,0.12)",
-                zerolinecolor="rgba(232,245,233,0.20)",
-                linecolor="rgba(232,245,233,0.25)",
-            ),
-            legend=dict(
-                bgcolor="rgba(16,42,29,0.35)",
-                bordercolor="rgba(232,245,233,0.10)",
-                borderwidth=1,
-            ),
-            margin=dict(l=10, r=10, t=40, b=10),
-        )
+        if st is None:
+                return default
+
+        if default not in THEME_OPTIONS:
+                default = "Dark"
+
+        if "theme_mode" not in st.session_state:
+                st.session_state["theme_mode"] = default
+
+        idx = THEME_OPTIONS.index(st.session_state["theme_mode"])
+        choice = st.sidebar.radio("Theme", options=THEME_OPTIONS, index=idx, horizontal=True)
+        st.session_state["theme_mode"] = choice
+        return choice
+
+
+def apply_app_theme(theme_mode: str) -> None:
+        """Apply CSS overrides for Light/Dark modes.
+
+        This doesn't fully replace Streamlit's native theming, but it gives a clean
+        and consistent look across the app without requiring a restart.
+        """
+
+        if st is None:
+                return
+
+        mode = (theme_mode or "Dark").strip().lower()
+        if mode.startswith("light"):
+                st.markdown(
+                        """
+<style>
+/* Light mode overrides */
+.stApp {
+    background-color: #F7FBF8;
+    color: #0B1F14;
+}
+
+/* Main text (markdown + captions) */
+[data-testid="stMarkdownContainer"],
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li {
+    color: #0B1F14;
+}
+
+[data-testid="stCaptionContainer"] {
+    color: rgba(11, 31, 20, 0.75);
+}
+
+/* Widget labels */
+[data-testid="stWidgetLabel"] {
+    color: #0B1F14;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #EAF5EF;
+}
+
+[data-testid="stSidebar"] * {
+    color: #0B1F14;
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+    color: #0B1F14;
+}
+
+/* Inputs */
+div[data-baseweb="select"] > div {
+    background-color: rgba(255,255,255,0.75);
+}
+
+/* Buttons */
+button[kind="primary"],
+button[kind="secondary"],
+button {
+    color: #0B1F14;
+}
+
+/* Dataframes */
+[data-testid="stDataFrame"] {
+    background-color: rgba(255,255,255,0.65);
+}
+
+/* Metric cards */
+div[data-testid="stMetric"] {
+    background: rgba(255,255,255,0.60);
+    border: 1px solid rgba(11, 31, 20, 0.12);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+</style>
+""",
+                        unsafe_allow_html=True,
+                )
+
+
+def _register_plotly_template(name: str, *, base_name: str, overlay_layout: go.Layout) -> None:
+        if name in pio.templates:
+                return
+
+        base = pio.templates[base_name] if base_name in pio.templates else None
+        tpl = go.layout.Template(base) if base is not None else go.layout.Template()
+        tpl.layout.update(overlay_layout)
+        pio.templates[name] = tpl
+
+
+def configure_plotly_theme(theme_mode: str | None = None) -> None:
+    """Configure Plotly defaults to match the selected app theme."""
+
+    mode = (theme_mode or "Dark").strip().lower()
+
+    dark_overlay = go.Layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#E8F5E9"),
+        colorway=[
+            "#2ECC71",
+            "#27AE60",
+            "#A3E4D7",
+            "#58D68D",
+            "#1E8449",
+            "#52BE80",
+        ],
+        xaxis=dict(
+            gridcolor="rgba(232,245,233,0.12)",
+            zerolinecolor="rgba(232,245,233,0.20)",
+            linecolor="rgba(232,245,233,0.25)",
+        ),
+        yaxis=dict(
+            gridcolor="rgba(232,245,233,0.12)",
+            zerolinecolor="rgba(232,245,233,0.20)",
+            linecolor="rgba(232,245,233,0.25)",
+        ),
+        legend=dict(
+            bgcolor="rgba(16,42,29,0.35)",
+            bordercolor="rgba(232,245,233,0.10)",
+            borderwidth=1,
+        ),
+        margin=dict(l=10, r=10, t=40, b=10),
     )
 
-    # Plotly v6 templates no longer support `Template + Template`.
-    tpl = go.layout.Template(base) if base is not None else go.layout.Template()
-    if overlay.layout is not None:
-        tpl.layout.update(overlay.layout)
+    light_overlay = go.Layout(
+        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="rgba(255,255,255,0)",
+        font=dict(color="#0B1F14"),
+        colorway=[
+            "#1E8449",
+            "#27AE60",
+            "#2ECC71",
+            "#16A085",
+            "#52BE80",
+            "#7DCEA0",
+        ],
+        xaxis=dict(
+            gridcolor="rgba(11,31,20,0.10)",
+            zerolinecolor="rgba(11,31,20,0.18)",
+            linecolor="rgba(11,31,20,0.22)",
+        ),
+        yaxis=dict(
+            gridcolor="rgba(11,31,20,0.10)",
+            zerolinecolor="rgba(11,31,20,0.18)",
+            linecolor="rgba(11,31,20,0.22)",
+        ),
+        legend=dict(
+            bgcolor="rgba(234,245,239,0.70)",
+            bordercolor="rgba(11,31,20,0.10)",
+            borderwidth=1,
+        ),
+        margin=dict(l=10, r=10, t=40, b=10),
+    )
 
-    pio.templates[PLOTLY_THEME_NAME] = tpl
-    pio.templates.default = PLOTLY_THEME_NAME
+    _register_plotly_template(PLOTLY_THEME_NAME, base_name="plotly_dark", overlay_layout=dark_overlay)
+    _register_plotly_template(
+        PLOTLY_THEME_LIGHT_NAME, base_name="plotly_white", overlay_layout=light_overlay
+    )
+
+    pio.templates.default = PLOTLY_THEME_LIGHT_NAME if mode.startswith("light") else PLOTLY_THEME_NAME
 
 
 def audience_selector(*, default: str = "Semi-technical") -> str:
