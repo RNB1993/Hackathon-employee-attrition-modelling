@@ -260,16 +260,24 @@ if uploaded is not None:
     st.write("Uploaded preview:")
     st.dataframe(up.head(20), use_container_width=True)
 
-    mapping = interaction_mapping(base_df)
-    required_raw_numeric = sorted(set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist()))
+    already_engineered = any(
+        c.startswith("inter_pos_") or c.startswith("inter_neg_") for c in up.columns
+    )
 
-    missing = ensure_required_columns(up, required_raw_numeric)
-    if missing:
-        st.error(
-            "Uploaded CSV is missing raw numeric columns required to build engineered interactions. "
-            f"Missing ({len(missing)}): {missing[:25]}" + ("..." if len(missing) > 25 else "")
+    if not already_engineered:
+        mapping = interaction_mapping(base_df)
+        required_raw_numeric = sorted(
+            set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist())
         )
-        st.stop()
+
+        missing = ensure_required_columns(up, required_raw_numeric)
+        if missing:
+            st.error(
+                "Uploaded CSV is missing raw numeric columns required to build engineered interactions. "
+                "Alternatively, upload a file that already contains engineered `inter_pos_*`/`inter_neg_*` columns. "
+                f"Missing ({len(missing)}): {missing[:25]}" + ("..." if len(missing) > 25 else "")
+            )
+            st.stop()
 
     try:
         out = predict_proba_attrition(model_label, up, dataset_for_mapping=base_df)
