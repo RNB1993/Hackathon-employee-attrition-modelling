@@ -1,31 +1,34 @@
 from __future__ import annotations
 
-import html
 import math
 import pickle
 from dataclasses import dataclass
-from datetime import datetime as dt
 from io import BytesIO
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.io as pio
-import streamlit as st
+import plotly.graph_objects as go
+
+try:
+    import streamlit as st
+except Exception:  # pragma: no cover
+    st = None  # type: ignore
 
 
 REPO_ROOT = Path(__file__).resolve().parent
 DATA_DIR = REPO_ROOT / "data"
 
-CLEANED_CSV_CANDIDATES: list[Path] = [
+CLEANED_CSV_CANDIDATES = [
     DATA_DIR / "Cleaned_dataset" / "WA_Fn-UseC_-HR-Employee-Attrition_capped.csv",
     DATA_DIR / "Cleaned_data" / "WA_Fn-UseC_-HR-Employee-Attrition_capped.csv",
+    REPO_ROOT / "WA_Fn-UseC_-HR-Employee-Attrition_capped.csv",
 ]
 
 MODEL_DIR = REPO_ROOT / "jupyter_notebooks" / "model"
-MODEL_CANDIDATES: dict[str, Path] = {
+MODEL_CANDIDATES = {
     "Best model": MODEL_DIR / "attrition_minority_yes_best_model.pkl",
     "Business-cost model": MODEL_DIR / "attrition_minority_yes_business_cost_second_best.pkl",
 }
@@ -33,266 +36,386 @@ MODEL_CANDIDATES: dict[str, Path] = {
 
 @dataclass(frozen=True)
 class InteractionRow:
-    name: str
-    description: str
+    interaction: str
+    kind: str  # "pos" or "neg"
+    raw_feature_1: str
+    raw_feature_2: str
+    spearman_r: float
 
 
-def _st_cache_data():
-    return getattr(st, "cache_data", st.cache)
+def _st_cache_data(func):
+    if st is None:
+        return func
+    return st.cache_data(show_spinner=False)(func)
 
 
-def _st_cache_resource():
-    return getattr(st, "cache_resource", st.cache)
+def _st_cache_resource(func):
+    if st is None:
+        return func
+    return st.cache_resource(show_spinner=False)(func)
 
 
-def set_page_config(*, page_title: str, layout: str = "wide") -> None:
-    st.set_page_config(page_title=page_title, page_icon="📊", layout=layout)
-
-
-def theme_selector(*, key: str = "theme_mode") -> str:
-    default = st.session_state.get(key, "Light")
-    theme = st.sidebar.radio("Theme", ["Light", "Dark"], index=0 if default == "Light" else 1, key=key)
-    return theme
-
-
-def audience_selector(*, key: str = "audience") -> str:
-    default = st.session_state.get(key, "Non-technical")
-    options = ["Non-technical", "Semi-technical", "Technical"]
-    idx = options.index(default) if default in options else 0
-    return st.sidebar.selectbox("Audience", options, index=idx, key=key)
-
-
-def apply_app_theme(theme_mode: str) -> None:
-    # Keep it lightweight: mainly tighten spacing and make charts fit well.
-    base = "#0e1117" if theme_mode == "Dark" else "#ffffff"
-    st.markdown(
-        f"""
-<style>
-section.main > div {{ padding-top: 1.25rem; }}
-.block-container {{ padding-top: 1.25rem; }}
-[data-testid='stAppViewContainer'] {{ background: {base}; }}
-</style>
-""",
-        unsafe_allow_html=True,
-    )
-
-
-def configure_plotly_theme(theme_mode: str) -> None:
-    pio.templates.default = "plotly_dark" if theme_mode == "Dark" else "plotly"
-
-
-def render_audience_markdown(audience: str, md_map: Mapping[str, str]) -> None:
-    st.markdown(md_map.get(audience, ""))
-
-
-@_st_cache_data()(show_spinner=False)
+@_st_cache_data
 def load_cleaned_dataset() -> pd.DataFrame:
-    for candidate in CLEANED_CSV_CANDIDATES:
-        if candidate.exists():
-            return pd.read_csv(candidate)
-    raise FileNotFoundError(
-        "Could not find cleaned dataset. Tried: " + ", ".join(str(p) for p in CLEANED_CSV_CANDIDATES)
-    )
+    path = next((p for p in CLEANED_CSV_CANDIDATES if p.exists()), None)
+    if path is None:
+        raise FileNotFoundError(
+            "Could not find cleaned dataset. Looked for: "
+            + ", ".join(str(p) for p in CLEANED_CSV_CANDIDATES)
+        )
+
+    df = pd.read_csv(path)
+    return df
 
 
-def apply_global_filters(df: pd.DataFrame) -> pd.DataFrame:
-    filtered = df
-
-    with st.sidebar.expander("Global filters", expanded=False):
-        if "Attrition" in filtered.columns:
-            opts = sorted(filtered["Attrition"].dropna().astype(str).unique().tolist())
-            selected = st.multiselect("Attrition", opts, default=opts)
-            if selected:
-                filtered = filtered[filtered["Attrition"].astype(str).isin(selected)]
-
-        if "Department" in filtered.columns:
-            opts = sorted(filtered["Department"].dropna().astype(str).unique().tolist())
-            selected = st.multiselect("Department", opts, default=opts)
-            if selected:
-                filtered = filtered[filtered["Department"].astype(str).isin(selected)]
-
-        if "JobRole" in filtered.columns:
-            opts = sorted(filtered["JobRole"].dropna().astype(str).unique().tolist())
-            selected = st.multiselect("JobRole", opts, default=opts)
-            if selected:
-                filtered = filtered[filtered["JobRole"].astype(str).isin(selected)]
-
-        if "Age" in filtered.columns:
-            ages = pd.to_numeric(filtered["Age"], errors="coerce")
-            if ages.notna().any():
-                min_age, max_age = int(ages.min()), int(ages.max())
-                low, high = st.slider("Age range", min_age, max_age, (min_age, max_age))
-                filtered = filtered[ages.between(low, high)]
-
-    return filtered
-
-
-def download_dataframe(df: pd.DataFrame, *, label: str = "Download CSV", filename: str = "data.csv") -> None:
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button(label, csv, file_name=filename, mime="text/csv")
-
-
-def download_plotly_html_report(
-    figures: Sequence[go.Figure],
-    *,
-    label: str = "Download Plotly HTML report",
-    filename: str = "report.html",
-    title: str = "Dashboard report",
-) -> None:
-    parts = [
-        "<!doctype html>",
-        "<html><head>",
-        f"<meta charset='utf-8'/><title>{html.escape(title)}</title>",
-        "</head><body>",
-        f"<h2>{html.escape(title)}</h2>",
-        f"<p>Generated: {dt.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>",
-    ]
-    for fig in figures:
-        parts.append(fig.to_html(full_html=False, include_plotlyjs="cdn"))
-        parts.append("<hr/>")
-    parts.append("</body></html>")
-
-    content = "\n".join(parts).encode("utf-8")
-    st.download_button(label, content, file_name=filename, mime="text/html")
-
-
-def short_plot_state_description(state: Mapping[str, object]) -> str:
-    items = [f"- **{k}**: {v}" for k, v in state.items() if v is not None and v != ""]
-    return "\n".join(items) if items else ""
-
-
+@_st_cache_data
 def numeric_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.select_dtypes(include=[np.number]).copy()
 
 
-def correlation_pairs(num_df: pd.DataFrame, *, method: str = "spearman") -> pd.DataFrame:
-    if num_df.empty:
-        return pd.DataFrame(columns=["feature_a", "feature_b", "r"])
-    corr = num_df.corr(method=method)
-    rows: list[dict[str, object]] = []
-    cols = list(corr.columns)
-    for i in range(len(cols)):
-        for j in range(i + 1, len(cols)):
-            rows.append({"feature_a": cols[i], "feature_b": cols[j], "r": float(corr.iloc[i, j])})
-    return pd.DataFrame(rows).sort_values("r", key=lambda s: s.abs(), ascending=False)
+@_st_cache_data
+def correlation_pairs(df: pd.DataFrame) -> pd.DataFrame:
+    num = numeric_df(df)
+    corr = num.corr(method="spearman")
+
+    corr_long = (
+        corr.where(~np.eye(corr.shape[0], dtype=bool)).stack().reset_index(name="spearman_r")
+    )
+    corr_long.columns = ["feature_1", "feature_2", "spearman_r"]
+
+    corr_long["pair_key"] = corr_long.apply(
+        lambda r: tuple(sorted([r["feature_1"], r["feature_2"]])), axis=1
+    )
+    corr_pairs = corr_long.drop_duplicates(subset=["pair_key"]).drop(columns=["pair_key"])
+
+    # Match the notebook: descending by spearman_r
+    corr_pairs = corr_pairs.sort_values("spearman_r", ascending=False).reset_index(drop=True)
+    return corr_pairs
 
 
-def metrics_bar_figure(metric_df: pd.DataFrame, *, x: str, y: str, color: str | None = None, title: str = "") -> go.Figure:
-    fig = go.Figure()
-    if color and color in metric_df.columns:
-        for val in metric_df[color].dropna().unique().tolist():
-            sub = metric_df[metric_df[color] == val]
-            fig.add_bar(name=str(val), x=sub[x], y=sub[y])
-    else:
-        fig.add_bar(x=metric_df[x], y=metric_df[y])
+@_st_cache_data
+def interaction_mapping(df: pd.DataFrame) -> pd.DataFrame:
+    """Return the mapping from inter_pos/inter_neg to the raw feature pairs.
 
-    fig.update_layout(title=title, barmode="group", height=420, margin=dict(l=10, r=10, t=50, b=10))
-    return fig
+    This follows the same ordering logic used in Feature_engineering.ipynb:
+    - correlations are sorted by spearman_r DESC
+    - positive pairs get inter_pos_001.. in that order
+    - negative pairs get inter_neg_001.. in that order (still descending, i.e. closest-to-zero first)
+    """
+
+    corr_pairs = correlation_pairs(df)
+
+    positive_pairs = corr_pairs[corr_pairs["spearman_r"] > 0].reset_index(drop=True)
+    negative_pairs = corr_pairs[corr_pairs["spearman_r"] < 0].reset_index(drop=True)
+
+    rows: list[dict] = []
+
+    for i, row in enumerate(positive_pairs.itertuples(index=False), start=1):
+        rows.append(
+            {
+                "interaction": f"inter_pos_{i:03d}",
+                "kind": "pos",
+                "raw_feature_1": row.feature_1,
+                "raw_feature_2": row.feature_2,
+                "spearman_r": float(row.spearman_r),
+                "formula": f"({row.feature_1} / {row.feature_2}) * {float(row.spearman_r):.6f}",
+            }
+        )
+
+    for i, row in enumerate(negative_pairs.itertuples(index=False), start=1):
+        rows.append(
+            {
+                "interaction": f"inter_neg_{i:03d}",
+                "kind": "neg",
+                "raw_feature_1": row.feature_1,
+                "raw_feature_2": row.feature_2,
+                "spearman_r": float(row.spearman_r),
+                "formula": f"({row.feature_1} * {row.feature_2}) * {float(row.spearman_r):.6f}",
+            }
+        )
+
+    return pd.DataFrame(rows)
 
 
-@_st_cache_resource()(show_spinner=False)
+def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
+    denom = denominator.replace(0, np.nan)
+    return numerator / denom
+
+
+def engineer_interactions(
+    df: pd.DataFrame,
+    mapping: pd.DataFrame,
+    target_col: str = "Attrition",
+) -> pd.DataFrame:
+    """Create `inter_pos_*` and `inter_neg_*` columns and drop the raw numeric inputs.
+
+    This mirrors the notebook logic closely.
+
+    Requirements:
+    - `df` must include all raw numeric columns referenced in `mapping`.
+    - categorical columns are preserved.
+
+    Returns a new engineered dataframe.
+    """
+
+    engineered = df.copy()
+    used_original_features: set[str] = set()
+
+    # Build pos and neg in the same order as mapping
+    for row in mapping.itertuples(index=False):
+        inter = row.interaction
+        f1 = row.raw_feature_1
+        f2 = row.raw_feature_2
+        r = float(row.spearman_r)
+
+        if f1 not in engineered.columns or f2 not in engineered.columns:
+            raise KeyError(
+                f"Missing required raw numeric columns for interaction {inter}: {f1}, {f2}"
+            )
+
+        if row.kind == "pos":
+            engineered[inter] = _safe_divide(engineered[f1], engineered[f2]) * r
+        else:
+            engineered[inter] = (engineered[f1] * engineered[f2]) * r
+
+        used_original_features.update([f1, f2])
+
+    # Drop original numeric features used in engineering, keep target if present
+    drop_original = [c for c in sorted(used_original_features) if c in engineered.columns]
+    if target_col in drop_original:
+        drop_original.remove(target_col)
+
+    engineered = engineered.drop(columns=drop_original)
+    return engineered
+
+
+@_st_cache_resource
 def load_pipeline(model_label: str):
     path = MODEL_CANDIDATES.get(model_label)
-    if not path or not path.exists():
-        raise FileNotFoundError(f"Model not found for '{model_label}': {path}")
+    if path is None:
+        raise KeyError(f"Unknown model label: {model_label}")
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found: {path}")
 
-    obj = pickle.loads(path.read_bytes())
-    if hasattr(obj, "predict_proba"):
-        return obj, {"artifact_name": path.name}
-    if isinstance(obj, dict) and "estimator" in obj:
-        return obj["estimator"], obj
-
-    raise TypeError(f"Unsupported model artifact type: {type(obj)}")
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
 
-def ensure_required_columns(df: pd.DataFrame, required: Iterable[str]) -> pd.DataFrame:
-    out = df.copy()
-    for col in required:
-        if col not in out.columns:
-            out[col] = 0
+def predict_proba_attrition(
+    model_label: str,
+    df_raw: pd.DataFrame,
+    dataset_for_mapping: pd.DataFrame,
+    target_col: str = "Attrition",
+) -> pd.DataFrame:
+    """Return a dataframe with predicted attrition probability for each row.
+
+    The saved sklearn pipeline expects engineered interaction features.
+    We reconstruct those interaction features using mapping derived from the training dataset.
+    """
+
+    pipe = load_pipeline(model_label)
+    mapping = interaction_mapping(dataset_for_mapping)
+
+    # If user already supplied engineered columns, do not re-engineer.
+    already_engineered = any(c.startswith("inter_pos_") or c.startswith("inter_neg_") for c in df_raw.columns)
+
+    if already_engineered:
+        X = df_raw.copy()
+    else:
+        X = engineer_interactions(df_raw, mapping=mapping, target_col=target_col)
+
+    if target_col in X.columns:
+        X = X.drop(columns=[target_col])
+
+    proba = pipe.predict_proba(X)[:, 1]
+    out = df_raw.copy()
+    out["pred_attrition_proba"] = proba
+    out["pred_attrition_label"] = (proba >= 0.5).astype(int)
     return out
 
 
-def engineer_interactions(df: pd.DataFrame) -> pd.DataFrame:
-    # The published dataset already contains engineered interaction columns like inter_pos_###.
-    # Keep this as a placeholder so the prediction page can be resilient if an older dataset is used.
-    return df
+def interaction_importance_table(
+    model_label: str,
+    dataset_for_mapping: pd.DataFrame,
+    top_n: int = 25,
+) -> pd.DataFrame:
+    pipe = load_pipeline(model_label)
+
+    # Extract LR + feature names after preprocessing
+    if not hasattr(pipe, "named_steps"):
+        raise TypeError("Expected a sklearn Pipeline with named_steps")
+
+    model = pipe.named_steps.get("model")
+    pre = pipe.named_steps.get("preprocessor") or pipe.named_steps.get("preprocess")
+
+    if model is None or pre is None:
+        raise KeyError("Pipeline must contain 'preprocessor' (or 'preprocess') and 'model' steps")
+
+    feature_names = list(pre.get_feature_names_out())
+    coefs = model.coef_[0]
+
+    mapping = interaction_mapping(dataset_for_mapping).set_index("interaction")
+
+    rows = []
+    for fname, c in zip(feature_names, coefs):
+        if "inter_pos_" not in fname and "inter_neg_" not in fname:
+            continue
+        inter = fname.split("__", 1)[-1]
+        if inter not in mapping.index:
+            continue
+        m = mapping.loc[inter]
+        rows.append(
+            {
+                "interaction": inter,
+                "kind": m["kind"],
+                "raw_feature_1": m["raw_feature_1"],
+                "raw_feature_2": m["raw_feature_2"],
+                "spearman_r": float(m["spearman_r"]),
+                "coef": float(c),
+                "abs_coef": float(abs(c)),
+                "odds_ratio": float(math.exp(c)),
+                "direction": "increases_attrition" if c > 0 else "decreases_attrition",
+            }
+        )
+
+    df = pd.DataFrame(rows).sort_values("abs_coef", ascending=False).reset_index(drop=True)
+    df.insert(0, "rank", np.arange(1, len(df) + 1))
+    return df.head(top_n)
 
 
-def predict_proba_attrition(pipeline, X: pd.DataFrame, *, positive_label: str = "Yes") -> np.ndarray:
-    if not hasattr(pipeline, "predict_proba"):
-        raise TypeError("Pipeline does not support predict_proba")
-
-    proba = pipeline.predict_proba(X)
-    classes = getattr(pipeline, "classes_", None)
-    if classes is None:
-        return proba[:, 1]
-
-    classes = list(classes)
-    if positive_label in classes:
-        return proba[:, classes.index(positive_label)]
-    return proba[:, 1]
+def ensure_required_columns(df: pd.DataFrame, required: Iterable[str]) -> list[str]:
+    missing = [c for c in required if c not in df.columns]
+    return missing
 
 
-def probability_indicator_figure(probability: float, *, title: str = "Attrition probability") -> go.Figure:
-    probability = float(max(0.0, min(1.0, probability)))
-    fig = go.Figure(
-        go.Indicator(
-            mode="gauge+number",
-            value=probability * 100,
-            number={"suffix": "%", "font": {"size": 36}},
-            title={"text": title},
-            gauge={
-                "axis": {"range": [0, 100]},
-                "bar": {"color": "#d62728"},
-                "steps": [
-                    {"range": [0, 33], "color": "#2ca02c"},
-                    {"range": [33, 66], "color": "#ffdd57"},
-                    {"range": [66, 100], "color": "#ff7f0e"},
-                ],
-            },
+AUDIENCE_OPTIONS = ["Non-technical", "Semi-technical", "Technical"]
+
+
+PLOTLY_THEME_NAME = "dark_green"
+
+
+def configure_plotly_theme() -> None:
+    """Configure Plotly defaults to match the app's dark-green Streamlit theme."""
+
+    # Idempotent: safe to call from multiple pages.
+    if PLOTLY_THEME_NAME in pio.templates:
+        pio.templates.default = PLOTLY_THEME_NAME
+        return
+
+    base = pio.templates["plotly_dark"] if "plotly_dark" in pio.templates else None
+    overlay = go.layout.Template(
+        layout=go.Layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#E8F5E9"),
+            colorway=[
+                "#2ECC71",
+                "#27AE60",
+                "#A3E4D7",
+                "#58D68D",
+                "#1E8449",
+                "#52BE80",
+            ],
+            xaxis=dict(
+                gridcolor="rgba(232,245,233,0.12)",
+                zerolinecolor="rgba(232,245,233,0.20)",
+                linecolor="rgba(232,245,233,0.25)",
+            ),
+            yaxis=dict(
+                gridcolor="rgba(232,245,233,0.12)",
+                zerolinecolor="rgba(232,245,233,0.20)",
+                linecolor="rgba(232,245,233,0.25)",
+            ),
+            legend=dict(
+                bgcolor="rgba(16,42,29,0.35)",
+                bordercolor="rgba(232,245,233,0.10)",
+                borderwidth=1,
+            ),
+            margin=dict(l=10, r=10, t=40, b=10),
         )
     )
-    fig.update_layout(height=320, margin=dict(l=10, r=10, t=60, b=10))
-    return fig
+
+    pio.templates[PLOTLY_THEME_NAME] = base + overlay if base is not None else overlay
+    pio.templates.default = PLOTLY_THEME_NAME
 
 
-def interaction_mapping(df: pd.DataFrame) -> pd.DataFrame:
-    # Best-effort mapping: list interaction columns present.
-    cols = [c for c in df.columns if c.startswith("inter_")]
-    return pd.DataFrame({"interaction": cols})
+def audience_selector(*, default: str = "Semi-technical") -> str:
+    """Persistent audience selector for all pages.
+
+    Stores selection in st.session_state["audience"]. If Streamlit is not available,
+    returns the default.
+    """
+
+    if st is None:
+        return default
+
+    if default not in AUDIENCE_OPTIONS:
+        default = "Semi-technical"
+
+    if "audience" not in st.session_state:
+        st.session_state["audience"] = default
+
+    # Render in sidebar; keep consistent across pages
+    idx = AUDIENCE_OPTIONS.index(st.session_state["audience"])
+    choice = st.sidebar.radio("Audience", options=AUDIENCE_OPTIONS, index=idx)
+    st.session_state["audience"] = choice
+    return choice
 
 
-def interaction_importance_table(pipeline, *, top_n: int = 25) -> pd.DataFrame:
-    # Attempt to compute importances in the transformed feature space.
-    if not hasattr(pipeline, "named_steps"):
-        return pd.DataFrame(columns=["feature", "importance"])
+def render_audience_markdown(blocks: dict[str, str], *, audience: str) -> None:
+    """Render the markdown for the current audience.
 
-    preprocess = pipeline.named_steps.get("preprocess")
-    model = pipeline.named_steps.get("model")
-    if preprocess is None or model is None:
-        return pd.DataFrame(columns=["feature", "importance"])
+    `blocks` should have keys matching AUDIENCE_OPTIONS.
+    """
 
-    try:
-        feature_names = list(preprocess.get_feature_names_out())
-    except Exception:
-        feature_names = None
+    if st is None:
+        return
 
-    importance = None
-    if hasattr(model, "coef_"):
-        coef = np.asarray(model.coef_)
-        if coef.ndim == 2:
-            coef = coef[0]
-        importance = np.abs(coef)
-    elif hasattr(model, "feature_importances_"):
-        importance = np.asarray(model.feature_importances_)
+    md = blocks.get(audience) or blocks.get("Semi-technical") or next(iter(blocks.values()), "")
+    if md:
+        st.markdown(md)
 
-    if importance is None:
-        return pd.DataFrame(columns=["feature", "importance"])
 
-    if feature_names and len(feature_names) == len(importance):
-        df_imp = pd.DataFrame({"feature": feature_names, "importance": importance})
-    else:
-        df_imp = pd.DataFrame({"feature": [f"f_{i}" for i in range(len(importance))], "importance": importance})
+def dataframe_to_excel_bytes(df: pd.DataFrame, *, sheet_name: str = "data") -> bytes:
+    """Convert a dataframe to an .xlsx file (as bytes) for download."""
 
-    return df_imp.sort_values("importance", ascending=False).head(int(top_n)).reset_index(drop=True)
+    bio = BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name[:31] or "data")
+    return bio.getvalue()
+
+
+def download_dataframe(
+    df: pd.DataFrame,
+    *,
+    file_stem: str,
+    label: str = "Download",
+    csv_kwargs: dict | None = None,
+    excel_sheet_name: str = "data",
+) -> None:
+    """Render CSV + Excel download buttons for a dataframe."""
+
+    if st is None:
+        return
+
+    csv_kwargs = csv_kwargs or {}
+    csv_bytes = df.to_csv(index=False, **csv_kwargs).encode("utf-8")
+    xlsx_bytes = dataframe_to_excel_bytes(df, sheet_name=excel_sheet_name)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            f"{label} CSV",
+            data=csv_bytes,
+            file_name=f"{file_stem}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            f"{label} Excel",
+            data=xlsx_bytes,
+            file_name=f"{file_stem}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )

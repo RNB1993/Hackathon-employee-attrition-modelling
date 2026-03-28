@@ -1,95 +1,99 @@
 from __future__ import annotations
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-import dashboard_utils as du
+from dashboard_utils import (
+    audience_selector,
+    configure_plotly_theme,
+    correlation_pairs,
+    download_dataframe,
+    interaction_importance_table,
+    interaction_mapping,
+    load_cleaned_dataset,
+    numeric_df,
+    render_audience_markdown,
+)
 
+st.set_page_config(page_title="Feature Engineering", layout="wide")
 
-AUDIENCE_MD = {
-    "Non-technical": """
-This page highlights correlations (numeric variables) and model-driven feature importance.
+configure_plotly_theme()
 
-Use it to spot which combinations of factors tend to move together.
-""".strip(),
-    "Semi-technical": """
-- Correlations use **Spearman r** (rank correlation) to reduce sensitivity to outliers.
-- Interaction ranking is computed from model coefficients / importances when available.
-""".strip(),
-    "Technical": """
-Correlations are computed on numeric-only columns. Model ranking is in the transformed feature space (post-preprocessing).
-""".strip(),
-}
+st.title("Feature Engineering — Correlations & Interactions")
 
+df = load_cleaned_dataset()
+num = numeric_df(df)
 
-def main() -> None:
-    du.set_page_config(page_title="Feature Engineering", layout="wide")
+audience = audience_selector()
 
-    theme_mode = du.theme_selector()
-    audience = du.audience_selector()
-    du.apply_app_theme(theme_mode)
-    du.configure_plotly_theme(theme_mode)
+render_audience_markdown(
+    {
+        "Non-technical": """
+This page shows which factors tend to move together and how we built extra *combined* features.
 
-    st.title("Feature Engineering — Correlations & Interactions")
+These patterns can suggest which levers matter, but correlation does not prove cause.
+""",
+        "Semi-technical": """
+Correlation view + engineered interaction features used by the prediction model.
 
-    with st.expander("How to read this page", expanded=True):
-        du.render_audience_markdown(audience, AUDIENCE_MD)
+- Heatmap: Spearman correlation (numeric)
+- Interaction mapping: how new features were constructed
+""",
+        "Technical": """
+Feature engineering audit:
 
-    df = du.load_cleaned_dataset()
-    df = du.apply_global_filters(df)
+- Spearman correlation matrix
+- Pairwise correlation list (deduped)
+- Interaction mapping to raw feature pairs
+- Model coefficient ranking for interaction features
+""",
+    },
+    audience=audience,
+)
 
-    num = du.numeric_df(df)
+with st.sidebar:
+    st.header("Controls")
+    abs_r_min = st.slider("Min |Spearman r|", 0.0, 1.0, 0.3, 0.05)
+    top_n = st.slider("Top N correlations", 10, 200, 30, 10)
+    model_label = st.selectbox("Model for interaction ranking", ["Best model", "Business-cost model"])
 
-    st.sidebar.header("Controls")
-    abs_r_min = st.sidebar.slider("Min |Spearman r|", min_value=0.0, max_value=1.0, value=0.35, step=0.05)
-    top_n = st.sidebar.slider("Top N correlations", min_value=10, max_value=200, value=40, step=10)
-    model_label = st.sidebar.selectbox("Model for interaction ranking", list(du.MODEL_CANDIDATES.keys()), index=0)
+st.subheader("Spearman correlation heatmap (numeric)")
+# Plotly heatmap
+corr = num.corr(method="spearman")
+fig = px.imshow(
+    corr,
+    color_continuous_scale="RdBu",
+    zmin=-1,
+    zmax=1,
+    aspect="auto",
+)
+fig.update_layout(height=650)
+st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Spearman correlation heatmap (numeric)")
-    if num.empty:
-        st.info("No numeric columns available after filters.")
-    else:
-        corr = num.corr(method="spearman")
-        fig = px.imshow(
-            corr,
-            color_continuous_scale="RdBu",
-            zmin=-1,
-            zmax=1,
-            aspect="auto",
-            title="Spearman correlation heatmap (numeric)",
-        )
-        fig.update_layout(height=600, margin=dict(l=10, r=10, t=60, b=10))
-        st.plotly_chart(fig, use_container_width=True)
-        du.download_plotly_html_report([fig], filename="correlation_heatmap.html", title="Correlation heatmap")
+st.subheader("Top correlated pairs")
+pairs = correlation_pairs(df)
+filtered = pairs[(pairs["spearman_r"].abs() >= abs_r_min)].copy().head(top_n)
+st.dataframe(filtered, use_container_width=True)
+download_dataframe(filtered, file_stem="correlation_pairs_filtered", label="Download table")
 
-    st.subheader("Top correlation pairs")
-    pairs = du.correlation_pairs(num, method="spearman")
-    if not pairs.empty:
-        pairs = pairs[pairs["r"].abs() >= abs_r_min].head(int(top_n))
-        st.dataframe(pairs, use_container_width=True, height=360)
-        du.download_dataframe(pairs, label="Download correlation pairs (CSV)", filename="correlation_pairs.csv")
-    else:
-        st.info("Not enough numeric columns to compute pairs.")
+st.subheader("Interaction feature mapping")
+map_df = interaction_mapping(df)
+st.caption("This maps each engineered `inter_pos_*` / `inter_neg_*` to its raw numeric feature pair.")
+st.dataframe(map_df.head(50), use_container_width=True)
+download_dataframe(map_df, file_stem="interaction_mapping", label="Download mapping")
 
-    st.subheader("Model feature ranking (best effort)")
-    try:
-        pipeline, meta = du.load_pipeline(model_label)
-        imp = du.interaction_importance_table(pipeline, top_n=35)
-    except Exception as e:
-        st.warning(f"Could not load model ranking: {e}")
-        imp = pd.DataFrame(columns=["feature", "importance"])
+st.subheader("Top interaction predictors (from saved model)")
+imp = interaction_importance_table(model_label=model_label, dataset_for_mapping=df, top_n=25)
+st.dataframe(imp, use_container_width=True)
+download_dataframe(imp, file_stem="interaction_importance_top25", label="Download ranking")
 
-    if imp.empty:
-        st.info("No importances available for the selected model.")
-    else:
-        st.dataframe(imp, use_container_width=True, height=360)
-        bar = px.bar(imp.head(25)[::-1], x="importance", y="feature", orientation="h", title="Top feature importances")
-        bar.update_layout(height=640)
-        st.plotly_chart(bar, use_container_width=True)
-        du.download_dataframe(imp, label="Download importance table (CSV)", filename="feature_importance.csv")
-        du.download_plotly_html_report([bar], filename="feature_importance.html", title="Feature importance")
-
-
-if __name__ == "__main__":
-    main()
+fig2 = px.bar(
+    imp.sort_values("coef"),
+    x="coef",
+    y="interaction",
+    color="direction",
+    orientation="h",
+    hover_data=["raw_feature_1", "raw_feature_2", "spearman_r", "odds_ratio"],
+)
+fig2.update_layout(height=700)
+st.plotly_chart(fig2, use_container_width=True)

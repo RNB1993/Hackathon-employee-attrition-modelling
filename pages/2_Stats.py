@@ -1,188 +1,154 @@
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import scipy.stats as stats
 import streamlit as st
+from scipy import stats
 
-import dashboard_utils as du
+from dashboard_utils import (
+    audience_selector,
+    configure_plotly_theme,
+    download_dataframe,
+    load_cleaned_dataset,
+    render_audience_markdown,
+)
 
+st.set_page_config(page_title="Stats", layout="wide")
 
-AUDIENCE_MD = {
-    "Non-technical": """
-This page provides simple statistical tests to support (or challenge) visual patterns.
+configure_plotly_theme()
 
-Treat results as *directional* rather than definitive.
-""".strip(),
-    "Semi-technical": """
-Numeric: Welch t-test + Mann–Whitney. Categorical: Chi-square + Cramér’s V.
+st.title("Stats — Quick Tests")
 
-Assumption checks are shown for context.
-""".strip(),
-    "Technical": """
-Use this page to quickly screen many columns; then validate with deeper modelling / controlled analysis.
-""".strip(),
-}
+df = load_cleaned_dataset()
 
+audience = audience_selector()
 
-def _cramers_v(confusion: pd.DataFrame) -> float:
-    if confusion.empty:
-        return float("nan")
-    chi2 = stats.chi2_contingency(confusion)[0]
-    n = confusion.to_numpy().sum()
-    if n == 0:
-        return float("nan")
-    r, k = confusion.shape
-    return math.sqrt((chi2 / n) / max(1, min(k - 1, r - 1)))
+render_audience_markdown(
+    {
+        "Non-technical": """
+This page runs simple checks to see whether a factor differs between employees who **left** vs **stayed**.
 
+Use it to support discussion—not as a final decision tool.
+""",
+        "Semi-technical": """
+Quick hypothesis tests / association checks.
 
-def _numeric_report(df: pd.DataFrame, target_col: str) -> pd.DataFrame:
-    target = df[target_col].astype(str)
-    classes = [c for c in ["No", "Yes"] if c in target.unique().tolist()]
-    if len(classes) < 2:
-        classes = target.dropna().unique().tolist()[:2]
-    if len(classes) < 2:
-        return pd.DataFrame()
+- Numeric vs target: Welch t-test and Mann–Whitney
+- Categorical vs target: Chi-square + Cramér’s V
+""",
+        "Technical": """
+Stat testing page.
 
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    rows: list[dict[str, object]] = []
+Numeric: Welch t-test + Mann–Whitney; Categorical: Chi-square + Cramér’s V.
+Assumption checks shown for context.
+""",
+    },
+    audience=audience,
+)
 
-    a = classes[0]
-    b = classes[1]
-
-    for col in num_cols:
-        xa = pd.to_numeric(df.loc[target == a, col], errors="coerce").dropna()
-        xb = pd.to_numeric(df.loc[target == b, col], errors="coerce").dropna()
-        if len(xa) < 5 or len(xb) < 5:
-            continue
-
-        t_stat, t_p = stats.ttest_ind(xa, xb, equal_var=False)
-        u_stat, u_p = stats.mannwhitneyu(xa, xb, alternative="two-sided")
-
-        rows.append(
-            {
-                "feature": col,
-                f"mean_{a}": float(xa.mean()),
-                f"mean_{b}": float(xb.mean()),
-                "welch_t_p": float(t_p),
-                "mannwhitney_p": float(u_p),
-                "n_a": int(len(xa)),
-                "n_b": int(len(xb)),
-            }
-        )
-
-    out = pd.DataFrame(rows)
-    if out.empty:
-        return out
-    return out.sort_values("mannwhitney_p", ascending=True)
-
-
-def _categorical_report(df: pd.DataFrame, target_col: str) -> pd.DataFrame:
-    target = df[target_col].astype(str)
-    classes = [c for c in ["No", "Yes"] if c in target.unique().tolist()]
-    if len(classes) < 2:
-        classes = target.dropna().unique().tolist()[:2]
-    if len(classes) < 2:
-        return pd.DataFrame()
-
-    cat_cols = [c for c in df.columns if c != target_col and df[c].dtype == object]
-    rows: list[dict[str, object]] = []
-
-    for col in cat_cols:
-        ct = pd.crosstab(df[col].astype(str), target)
-        if ct.shape[0] < 2 or ct.shape[1] < 2:
-            continue
-
-        chi2, p, dof, _ = stats.chi2_contingency(ct)
-        rows.append(
-            {
-                "feature": col,
-                "chi2_p": float(p),
-                "cramers_v": float(_cramers_v(ct)),
-                "dof": int(dof),
-            }
-        )
-
-    out = pd.DataFrame(rows)
-    if out.empty:
-        return out
-    return out.sort_values("chi2_p", ascending=True)
-
-
-def main() -> None:
-    du.set_page_config(page_title="Stats", layout="wide")
-
-    theme_mode = du.theme_selector()
-    audience = du.audience_selector()
-    du.apply_app_theme(theme_mode)
-    du.configure_plotly_theme(theme_mode)
-
-    st.title("Stats — Quick Tests")
-    st.caption("Stat testing page.\n\nNumeric: Welch t-test + Mann–Whitney; Categorical: Chi-square + Cramér’s V.\nAssumption checks shown for context.")
-
-    with st.expander("How to read this page", expanded=True):
-        du.render_audience_markdown(audience, AUDIENCE_MD)
-
-    df = du.load_cleaned_dataset()
-    df = du.apply_global_filters(df)
-
-    if "Attrition" not in df.columns:
-        st.error("Expected column 'Attrition' not found.")
-        return
-
+# Normalize target to binary 0/1
+if "Attrition" in df.columns and df["Attrition"].dtype == object:
+    y = (df["Attrition"].astype(str).str.lower() == "yes").astype(int)
+    df = df.copy()
+    df["Attrition_bin"] = y
+    target_col = "Attrition_bin"
+elif "Attrition" in df.columns:
     target_col = "Attrition"
+else:
+    target_col = st.selectbox("Target column", options=df.columns)
 
-    overlay_opacity = st.sidebar.slider(
-        "Overlay opacity (grouped histograms)",
-        min_value=0.05,
-        max_value=0.95,
-        value=0.45,
-        step=0.05,
-        help="Lower opacity makes overlapping groups easier to distinguish.",
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+cat_cols = [c for c in df.columns if c not in num_cols]
+
+with st.sidebar:
+    st.header("Test selection")
+    test_kind = st.radio(
+        "Test",
+        ["Numeric vs Target (t-test / Mann-Whitney)", "Categorical vs Target (Chi-square)"],
     )
 
-    tabs = st.tabs(["Numeric", "Categorical"])
+if test_kind.startswith("Numeric"):
+    col = st.selectbox("Numeric column", options=[c for c in num_cols if c != target_col])
 
-    with tabs[0]:
-        rep = _numeric_report(df, target_col)
-        if rep.empty:
-            st.info("No numeric columns or insufficient data after filters.")
-        else:
-            st.subheader("Numeric tests")
-            st.dataframe(rep, use_container_width=True, height=340)
-            du.download_dataframe(rep, label="Download numeric report (CSV)", filename="stats_numeric.csv")
+    g0 = df[df[target_col] == 0][col].dropna()
+    g1 = df[df[target_col] == 1][col].dropna()
 
-            feat = st.selectbox("Feature to visualize", rep["feature"].tolist(), index=0)
-            fig = px.histogram(df, x=feat, color=target_col, barmode="overlay", opacity=overlay_opacity)
-            fig.update_layout(height=420)
-            st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Group distributions")
+    fig = px.histogram(df, x=col, color=target_col, barmode="overlay", marginal="box")
+    st.plotly_chart(fig, use_container_width=True)
 
-            du.download_plotly_html_report([fig], filename="stats_numeric_plot.html", title=f"Stats plot — {feat}")
+    st.subheader("Assumption checks")
+    sh0 = stats.shapiro(g0.sample(min(len(g0), 500), random_state=0)) if len(g0) >= 3 else None
+    sh1 = stats.shapiro(g1.sample(min(len(g1), 500), random_state=0)) if len(g1) >= 3 else None
+    lev = stats.levene(g0, g1) if len(g0) >= 2 and len(g1) >= 2 else None
 
-    with tabs[1]:
-        rep = _categorical_report(df, target_col)
-        if rep.empty:
-            st.info("No categorical columns or insufficient data after filters.")
-        else:
-            st.subheader("Categorical tests")
-            st.dataframe(rep, use_container_width=True, height=340)
-            du.download_dataframe(rep, label="Download categorical report (CSV)", filename="stats_categorical.csv")
+    st.write(
+        {
+            "n_group0": int(len(g0)),
+            "n_group1": int(len(g1)),
+            "shapiro_p_group0": None if sh0 is None else float(sh0.pvalue),
+            "shapiro_p_group1": None if sh1 is None else float(sh1.pvalue),
+            "levene_p": None if lev is None else float(lev.pvalue),
+        }
+    )
 
-            feat = st.selectbox("Feature to visualize", rep["feature"].tolist(), index=0, key="cat_feat")
-            plot_df = (
-                df.assign(_count=1)
-                .groupby([feat, target_col], as_index=False)["_count"]
-                .sum()
-            )
-            fig = px.bar(plot_df, x=feat, y="_count", color=target_col, barmode="group")
-            fig.update_layout(height=420)
-            st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Tests")
+    # Welch t-test is a good default when variances differ
+    t_res = stats.ttest_ind(g0, g1, equal_var=False, nan_policy="omit")
+    try:
+        mw = stats.mannwhitneyu(g0, g1, alternative="two-sided")
+        mw_p = float(mw.pvalue)
+    except Exception:
+        mw_p = None
 
-            du.download_plotly_html_report([fig], filename="stats_categorical_plot.html", title=f"Stats plot — {feat}")
+    results = {
+        "welch_ttest_stat": float(t_res.statistic),
+        "welch_ttest_p": float(t_res.pvalue),
+        "mann_whitney_p": mw_p,
+        "mean_group0": float(g0.mean()) if len(g0) else None,
+        "mean_group1": float(g1.mean()) if len(g1) else None,
+        "n_group0": int(len(g0)),
+        "n_group1": int(len(g1)),
+        "column": col,
+        "target_col": target_col,
+    }
+    st.write(results)
 
+    st.subheader("Download")
+    download_dataframe(pd.DataFrame([results]), file_stem="stats_numeric_results", label="Download results")
 
-if __name__ == "__main__":
-    main()
+else:
+    cat = st.selectbox("Categorical column", options=[c for c in cat_cols if c != target_col])
+
+    ct = pd.crosstab(df[cat], df[target_col], dropna=False)
+    chi2, p, dof, expected = stats.chi2_contingency(ct)
+
+    # Cramér's V
+    n = ct.to_numpy().sum()
+    phi2 = chi2 / n
+    r, k = ct.shape
+    cramers_v = np.sqrt(phi2 / max(1, min(k - 1, r - 1)))
+
+    st.subheader("Contingency table")
+    st.dataframe(ct, use_container_width=True)
+
+    st.subheader("Download")
+    download_dataframe(ct.reset_index(), file_stem="stats_contingency_table", label="Download contingency")
+
+    st.subheader("Chi-square results")
+    chi_results = {
+        "chi2": float(chi2),
+        "p_value": float(p),
+        "dof": int(dof),
+        "cramers_v": float(cramers_v),
+        "categorical_col": cat,
+        "target_col": target_col,
+    }
+    st.write(chi_results)
+    download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
+
+    st.subheader("Bar chart")
+    plot_df = ct.reset_index().melt(id_vars=cat, var_name=target_col, value_name="count")
+    fig = px.bar(plot_df, x=cat, y="count", color=target_col, barmode="group")
+    st.plotly_chart(fig, use_container_width=True)
