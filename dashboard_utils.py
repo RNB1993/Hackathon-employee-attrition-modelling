@@ -46,12 +46,33 @@ class InteractionRow:
 def _st_cache_data(func):
     if st is None:
         return func
+
+    # Avoid Streamlit cache wrappers when running as a normal python script
+    # (e.g., CLI smoke tests) because it produces noisy warnings and provides
+    # no benefit without a Streamlit runtime.
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx  # type: ignore
+
+        if get_script_run_ctx() is None:
+            return func
+    except Exception:
+        return func
+
     return st.cache_data(show_spinner=False)(func)
 
 
 def _st_cache_resource(func):
     if st is None:
         return func
+
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx  # type: ignore
+
+        if get_script_run_ctx() is None:
+            return func
+    except Exception:
+        return func
+
     return st.cache_resource(show_spinner=False)(func)
 
 
@@ -335,7 +356,12 @@ def configure_plotly_theme() -> None:
         )
     )
 
-    pio.templates[PLOTLY_THEME_NAME] = base + overlay if base is not None else overlay
+    # Plotly v6 templates no longer support `Template + Template`.
+    tpl = go.layout.Template(base) if base is not None else go.layout.Template()
+    if overlay.layout is not None:
+        tpl.layout.update(overlay.layout)
+
+    pio.templates[PLOTLY_THEME_NAME] = tpl
     pio.templates.default = PLOTLY_THEME_NAME
 
 
