@@ -109,15 +109,133 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> None:
 
 pipe = _get_pipe(model_label)
 mapping = interaction_mapping(base_df)
+required_raw_numeric = sorted(
+    set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist())
+)
 
-st.subheader("Option A — Predict on an existing employee from the dataset")
-row_id = st.number_input("Row index", min_value=0, max_value=len(base_df) - 1, value=0, step=1)
-row_base = base_df.iloc[[int(row_id)]].copy()
+st.subheader("Option A — Select an employee (or group) by features")
+st.caption(
+    "Instead of picking a row index, filter by employee attributes. You can score a whole group, "
+    "then optionally pick one employee for detailed what-if analysis."
+)
 
-# If the base row changes, drop previously-entered overrides to avoid confusion.
-if st.session_state.get("row_overrides_row_id") != int(row_id):
+# --- Build a lightweight filtering UI ---
+filterable_cat_cols = [
+    c
+    for c in [
+        "Department",
+        "JobRole",
+        "JobLevel",
+        "BusinessTravel",
+        "OverTime",
+        "Gender",
+        "MaritalStatus",
+        "EducationField",
+    ]
+    if c in base_df.columns
+]
+
+filterable_num_cols = [
+    c
+    for c in [
+        "Age",
+        "MonthlyIncome",
+        "DistanceFromHome",
+        "YearsAtCompany",
+        "TotalWorkingYears",
+    ]
+    if c in base_df.columns
+]
+
+with st.expander("Filter employees", expanded=True):
+    cat_filters: dict[str, list[str]] = {}
+    if filterable_cat_cols:
+        st.markdown("**Categorical filters**")
+        for col in filterable_cat_cols:
+            opts = sorted(base_df[col].astype(str).fillna("(missing)").unique().tolist())
+            picked = st.multiselect(f"{col}", options=opts, default=[])
+            if picked:
+                cat_filters[col] = picked
+
+    num_filters: dict[str, tuple[float, float]] = {}
+    if filterable_num_cols:
+        st.markdown("**Numeric filters**")
+        for col in filterable_num_cols:
+            s = pd.to_numeric(base_df[col], errors="coerce").dropna()
+            if s.empty:
+                continue
+            lo = float(np.percentile(s, 1))
+            hi = float(np.percentile(s, 99))
+            if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+                continue
+            picked = st.slider(col, min_value=lo, max_value=hi, value=(lo, hi))
+            # Only apply if user narrowed the range
+            if picked[0] > lo or picked[1] < hi:
+                num_filters[col] = (float(picked[0]), float(picked[1]))
+
+filtered = base_df.copy()
+for col, picked in cat_filters.items():
+    filtered = filtered[filtered[col].astype(str).fillna("(missing)").isin(picked)]
+for col, (lo, hi) in num_filters.items():
+    s = pd.to_numeric(filtered[col], errors="coerce")
+    filtered = filtered[(s >= lo) & (s <= hi)]
+
+st.write(f"Filtered employees: **{len(filtered):,}** / {len(base_df):,}")
+
+if len(filtered) == 0:
+    st.warning("No employees match the current filters. Widen filters to continue.")
+    st.stop()
+
+st.dataframe(filtered.head(30), use_container_width=True)
+
+st.markdown("### Score the filtered group (optional)")
+score_group = st.button("Score filtered group", type="secondary")
+group_out = None
+if score_group:
+    try:
+        group_out = predict_proba_attrition(model_label, filtered, dataset_for_mapping=base_df)
+        st.success("Group predictions computed.")
+
+        fig = px.histogram(
+            group_out,
+            x="pred_attrition_proba",
+            nbins=30,
+            title="Predicted attrition probability — filtered group",
+        )
+        fig.update_layout(
+            xaxis_tickformat=",.0%",
+            height=320,
+            margin=dict(l=10, r=10, t=40, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Download group predictions")
+        download_dataframe(group_out, file_stem="filtered_group_predictions", label="Download")
+    except Exception as e:
+        st.error(f"Group prediction failed: {e}")
+
+st.markdown("### Pick one employee for detailed analysis")
+id_col = "EmployeeNumber" if "EmployeeNumber" in filtered.columns else None
+if id_col:
+    labels = (
+        filtered[[id_col] + [c for c in ["JobRole", "Department", "Age"] if c in filtered.columns]]
+        .astype(str)
+        .fillna("")
+        .apply(lambda r: " | ".join([f"{id_col}={r[id_col]}"] + [f"{c}={r[c]}" for c in r.index if c != id_col and r[c] != ""]), axis=1)
+    )
+    selected_label = st.selectbox("Employee", options=labels.tolist(), index=0)
+    selected_idx = labels[labels == selected_label].index[0]
+    row_base = filtered.loc[[selected_idx]].copy()
+else:
+    # Fall back to filtered position index
+    pos = st.number_input("Employee position in filtered table", 0, max(0, len(filtered) - 1), 0, 1)
+    row_base = filtered.iloc[[int(pos)]].copy()
+
+# If the base employee changes, drop previously-entered overrides to avoid confusion.
+row_key = str(row_base.index[0])
+if st.session_state.get("row_overrides_row_key") != row_key:
     st.session_state.pop("row_overrides", None)
-    st.session_state["row_overrides_row_id"] = int(row_id)
+    st.session_state["row_overrides_row_key"] = row_key
 
 st.write("Selected row (raw):")
 st.dataframe(row_base, use_container_width=True)
@@ -265,11 +383,6 @@ if uploaded is not None:
     )
 
     if not already_engineered:
-        mapping = interaction_mapping(base_df)
-        required_raw_numeric = sorted(
-            set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist())
-        )
-
         missing = ensure_required_columns(up, required_raw_numeric)
         if missing:
             st.error(
