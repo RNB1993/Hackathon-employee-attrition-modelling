@@ -1201,6 +1201,17 @@ def _audience_slug(audience: str) -> str:
     )
 
 
+def _file_slug(text: str) -> str:
+    """Slug for filenames; keep it stable and conservative."""
+
+    s = (text or "item").strip().lower()
+    for ch in ("/", "\\", ":", "?", "*", '"', "<", ">", "|", "\n", "\r", "\t"):
+        s = s.replace(ch, " ")
+    s = s.replace("-", " ")
+    s = "_".join([p for p in s.split() if p])
+    return s[:80] or "item"
+
+
 def _coerce_to_report_figures(
     figures: Sequence[tuple[str, object]] | None,
 ) -> list[tuple[str, go.Figure]]:
@@ -1373,6 +1384,7 @@ def download_plotly_html_report(
     figures: Sequence[tuple[str, object]] | None = None,
     tables: Sequence[tuple[str, pd.DataFrame]] | None = None,
     include_plotlyjs: str | bool = True,
+    enable_table_downloads: bool = True,
 ) -> None:
     """Render download buttons for HTML reports (current audience + grouped)."""
 
@@ -1416,3 +1428,29 @@ def download_plotly_html_report(
             mime="text/html",
             use_container_width=True,
         )
+
+    # Optional: provide the same tables as CSV/XLSX/TXT.
+    # This can be expensive for large tables because Excel bytes are built eagerly,
+    # so keep it behind a user toggle.
+    if enable_table_downloads and tables:
+        with st.expander("Also download report tables (CSV / Excel / TXT)", expanded=False):
+            prep_key = f"{file_stem}__prep_table_downloads"
+            prep = st.checkbox(
+                "Prepare table downloads",
+                value=False,
+                key=prep_key,
+                help="When enabled, generates CSV/XLSX/TXT buttons for each table included in the HTML report.",
+            )
+            if prep:
+                for tname, tdf in tables:
+                    if tdf is None:
+                        continue
+                    try:
+                        st.markdown(f"**{tname}**")
+                    except Exception:
+                        pass
+                    download_dataframe(
+                        tdf,
+                        file_stem=f"{file_stem}__{_file_slug(str(tname))}",
+                        label="Download",
+                    )
