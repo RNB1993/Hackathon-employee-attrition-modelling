@@ -1,4 +1,4 @@
-mkdir -p ~/.streamlit/
+mkdir -p "$HOME/.streamlit/"
 
 # Heroku sets $PORT automatically; default locally.
 PORT=${PORT:-8501}
@@ -10,4 +10,4 @@ port = $PORT\n\
 enableCORS = false\n\
 enableXsrfProtection = false\n\
 \n\
-" > ~/.streamlit/config.toml
+" > "$HOME/.streamlit/config.toml"
