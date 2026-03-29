@@ -764,6 +764,164 @@ def render_audience_markdown(blocks: dict[str, str], *, audience: str) -> None:
         st.markdown(md)
 
 
+def apply_global_filters(
+    df: pd.DataFrame,
+    *,
+    key_prefix: str = "global",
+    enabled_by_default: bool = True,
+) -> pd.DataFrame:
+    """Render a global filter panel in the sidebar and return the filtered dataframe.
+
+    - Filter selections are persisted in st.session_state.
+    - Designed to be called on every page so filters apply consistently.
+    - If Streamlit is not available, returns df unchanged.
+    """
+
+    if st is None:
+        return df
+
+    if df is None or df.empty:
+        return df
+
+    # Keep key naming stable across pages.
+    def _k(name: str) -> str:
+        return f"{key_prefix}__{name}"
+
+    enable_key = _k("enabled")
+    if enable_key not in st.session_state:
+        st.session_state[enable_key] = bool(enabled_by_default)
+
+    with st.sidebar:
+        st.markdown("### Global filters")
+        enabled = st.toggle(
+            "Enable global filters",
+            key=enable_key,
+            help="When enabled, filters apply to charts and tables on every page.",
+        )
+
+        with st.expander("Filters", expanded=False):
+            st.caption("Tip: Keep groupings small (e.g., ≤ 12 categories) for clearer plots.")
+
+            # Choose a pragmatic set of columns if they exist.
+            preferred_cat_cols = [
+                "Attrition",
+                "Department",
+                "JobRole",
+                "OverTime",
+                "Gender",
+                "MaritalStatus",
+                "BusinessTravel",
+                "JobLevel",
+                "EducationField",
+            ]
+            preferred_num_cols = [
+                "Age",
+                "MonthlyIncome",
+                "DistanceFromHome",
+                "YearsAtCompany",
+                "TotalWorkingYears",
+            ]
+
+            cat_cols = [c for c in preferred_cat_cols if c in df.columns]
+            num_cols = [c for c in preferred_num_cols if c in df.columns]
+
+            # Track keys to enable a clean reset.
+            reset_keys: list[str] = [enable_key]
+
+            if cat_cols:
+                st.markdown("**Categorical**")
+                for col in cat_cols:
+                    key = _k(f"cat__{col}")
+                    reset_keys.append(key)
+                    opts = (
+                        df[col]
+                        .astype(str)
+                        .fillna("(missing)")
+                        .unique()
+                        .tolist()
+                    )
+                    opts = sorted(opts)
+                    st.multiselect(
+                        col,
+                        options=opts,
+                        default=st.session_state.get(key, []),
+                        key=key,
+                    )
+
+            if num_cols:
+                st.markdown("**Numeric**")
+                for col in num_cols:
+                    s = pd.to_numeric(df[col], errors="coerce").dropna()
+                    if s.empty:
+                        continue
+                    # Use robust bounds to avoid a single outlier dominating the slider.
+                    lo = float(np.percentile(s, 1))
+                    hi = float(np.percentile(s, 99))
+                    if not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
+                        lo = float(s.min())
+                        hi = float(s.max())
+                    if not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
+                        continue
+
+                    key = _k(f"num__{col}")
+                    reset_keys.append(key)
+                    default_val = st.session_state.get(key, (lo, hi))
+                    try:
+                        default_val = (float(default_val[0]), float(default_val[1]))
+                    except Exception:
+                        default_val = (lo, hi)
+
+                    st.slider(
+                        col,
+                        min_value=float(lo),
+                        max_value=float(hi),
+                        value=(
+                            max(float(lo), min(float(hi), default_val[0])),
+                            max(float(lo), min(float(hi), default_val[1])),
+                        ),
+                        key=key,
+                    )
+
+            if st.button("Reset filters", type="secondary"):
+                for k in reset_keys:
+                    st.session_state.pop(k, None)
+                st.session_state[enable_key] = bool(enabled_by_default)
+                st.rerun()
+
+    if not bool(st.session_state.get(enable_key, enabled_by_default)):
+        return df
+
+    filtered = df
+
+    # Apply categorical filters
+    for col in [c for c in df.columns if _k(f"cat__{c}") in st.session_state]:
+        picked = st.session_state.get(_k(f"cat__{col}"), [])
+        if picked:
+            s = filtered[col].astype(str).fillna("(missing)")
+            filtered = filtered[s.isin([str(v) for v in picked])]
+
+    # Apply numeric filters
+    for col in [c for c in df.columns if _k(f"num__{c}") in st.session_state]:
+        rng = st.session_state.get(_k(f"num__{col}"))
+        if not rng or len(rng) != 2:
+            continue
+        try:
+            lo, hi = float(rng[0]), float(rng[1])
+        except Exception:
+            continue
+        s = pd.to_numeric(filtered[col], errors="coerce")
+        filtered = filtered[(s >= lo) & (s <= hi)]
+
+    # Small summary so users understand what they're seeing.
+    try:
+        if len(filtered) != len(df):
+            st.sidebar.caption(f"Filtered rows: {len(filtered):,} / {len(df):,}")
+    except Exception:
+        pass
+
+    return filtered
+
+
 def dataframe_to_excel_bytes(df: pd.DataFrame, *, sheet_name: str = "data") -> bytes:
     """Convert a dataframe to an .xlsx file (as bytes) for download."""
 

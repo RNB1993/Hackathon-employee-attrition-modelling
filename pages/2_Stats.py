@@ -8,6 +8,7 @@ from scipy import stats
 
 from dashboard_utils import (
     apply_app_theme,
+    apply_global_filters,
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
@@ -26,6 +27,7 @@ configure_plotly_theme(theme_mode)
 st.title("Stats — Quick Tests")
 
 df = load_cleaned_dataset()
+df = apply_global_filters(df)
 
 audience = audience_selector()
 
