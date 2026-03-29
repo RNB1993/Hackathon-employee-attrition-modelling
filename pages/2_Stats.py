@@ -11,6 +11,7 @@ from dashboard_utils import (
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
+    download_plotly_html_report,
     load_cleaned_dataset,
     render_audience_markdown,
     theme_selector,
@@ -28,27 +29,38 @@ df = load_cleaned_dataset()
 
 audience = audience_selector()
 
-render_audience_markdown(
-    {
-        "Non-technical": """
+AUDIENCE_MD = {
+    "Non-technical": """
 This page runs simple checks to see whether a factor differs between employees who **left** vs **stayed**.
 
 Use it to support discussion—not as a final decision tool.
 """,
-        "Semi-technical": """
+    "Semi-technical": """
 Quick hypothesis tests / association checks.
 
 - Numeric vs target: Welch t-test and Mann–Whitney
 - Categorical vs target: Chi-square + Cramér’s V
 """,
-        "Technical": """
+    "Technical": """
 Stat testing page.
 
 Numeric: Welch t-test + Mann–Whitney; Categorical: Chi-square + Cramér’s V.
 Assumption checks shown for context.
 """,
-    },
-    audience=audience,
+}
+
+render_audience_markdown(AUDIENCE_MD, audience=audience)
+
+report_fig = None
+report_tables: list[tuple[str, pd.DataFrame]] = []
+
+overlay_opacity = st.slider(
+    "Overlay opacity (grouped histograms)",
+    min_value=0.15,
+    max_value=0.95,
+    value=0.65,
+    step=0.05,
+    help="Lower opacity makes overlapping groups easier to distinguish.",
 )
 
 # Normalize target to binary 0/1
@@ -79,8 +91,23 @@ if test_kind.startswith("Numeric"):
     g1 = df[df[target_col] == 1][col].dropna()
 
     st.subheader("Group distributions")
-    fig = px.histogram(df, x=col, color=target_col, barmode="overlay", marginal="box")
+
+    plot_df = df.copy()
+    color_col = target_col
+    # If the target is a small-cardinality numeric column (e.g., 0/1), force discrete colors.
+    try:
+        nunique = int(plot_df[target_col].nunique(dropna=False))
+    except Exception:
+        nunique = 999
+    if pd.api.types.is_numeric_dtype(plot_df[target_col]) and nunique <= 10:
+        plot_df["_target_group"] = plot_df[target_col].astype("Int64").astype(str)
+        color_col = "_target_group"
+
+    fig = px.histogram(plot_df, x=col, color=color_col, barmode="overlay", marginal="box")
+    fig.update_traces(opacity=overlay_opacity)
+    fig.update_layout(legend_title_text=str(target_col))
     st.plotly_chart(fig, use_container_width=True)
+    report_fig = fig
 
     st.subheader("Assumption checks")
     sh0 = stats.shapiro(g0.sample(min(len(g0), 500), random_state=0)) if len(g0) >= 3 else None
@@ -119,6 +146,8 @@ if test_kind.startswith("Numeric"):
     }
     st.write(results)
 
+    report_tables.append(("Test results", pd.DataFrame([results])))
+
     st.subheader("Download")
     download_dataframe(pd.DataFrame([results]), file_stem="stats_numeric_results", label="Download results")
 
@@ -137,6 +166,8 @@ else:
     st.subheader("Contingency table")
     st.dataframe(ct, use_container_width=True)
 
+    report_tables.append(("Contingency table", ct.reset_index()))
+
     st.subheader("Download")
     download_dataframe(ct.reset_index(), file_stem="stats_contingency_table", label="Download contingency")
 
@@ -152,7 +183,24 @@ else:
     st.write(chi_results)
     download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
 
+    report_tables.append(("Chi-square results", pd.DataFrame([chi_results])))
+
     st.subheader("Bar chart")
     plot_df = ct.reset_index().melt(id_vars=cat, var_name=target_col, value_name="count")
-    fig = px.bar(plot_df, x=cat, y="count", color=target_col, barmode="group")
+    # Force discrete colors for small numeric targets.
+    plot_df["_target_group"] = plot_df[target_col].astype(str)
+    fig = px.bar(plot_df, x=cat, y="count", color="_target_group", barmode="group")
+    fig.update_layout(legend_title_text=str(target_col))
     st.plotly_chart(fig, use_container_width=True)
+    report_fig = fig
+
+st.subheader("Download page report (HTML)")
+download_plotly_html_report(
+    title="Stats — Quick Tests",
+    file_stem="report_stats",
+    audience=audience,
+    audience_markdown=AUDIENCE_MD,
+    theme_mode=theme_mode,
+    figures=[("Selected test chart", report_fig)] if report_fig is not None else None,
+    tables=report_tables,
+)

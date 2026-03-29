@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import datetime as dt
+import html
 import math
 import pickle
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -351,47 +353,53 @@ PLOTLY_THEME_LIGHT_NAME = "light_green"
 
 
 def theme_selector(*, default: str = "Dark") -> str:
-        """Persistent theme selector for all pages.
+    """Persistent theme selector for all pages.
 
-        Notes:
-        - Streamlit's built-in theme (config.toml) is static at startup.
-        - This selector applies a lightweight CSS override plus Plotly templates.
-        """
+    Notes:
+    - Streamlit's built-in theme (config.toml) is static at startup.
+    - This selector applies a lightweight CSS override plus Plotly templates.
+    """
 
-        if st is None:
-                return default
+    if st is None:
+        return default
 
-        if default not in THEME_OPTIONS:
-                default = "Dark"
+    if default not in THEME_OPTIONS:
+        default = "Dark"
 
-        if "theme_mode" not in st.session_state:
-                st.session_state["theme_mode"] = default
+    if "theme_mode" not in st.session_state:
+        st.session_state["theme_mode"] = default
 
-        idx = THEME_OPTIONS.index(st.session_state["theme_mode"])
-        choice = st.sidebar.radio("Theme", options=THEME_OPTIONS, index=idx, horizontal=True)
-        st.session_state["theme_mode"] = choice
-        return choice
+    idx = THEME_OPTIONS.index(st.session_state["theme_mode"])
+    choice = st.sidebar.radio("Theme", options=THEME_OPTIONS, index=idx, horizontal=True)
+    st.session_state["theme_mode"] = choice
+    return choice
 
 
 def apply_app_theme(theme_mode: str) -> None:
-        """Apply CSS overrides for Light/Dark modes.
+    """Apply CSS overrides for Light/Dark modes.
 
-        This doesn't fully replace Streamlit's native theming, but it gives a clean
-        and consistent look across the app without requiring a restart.
-        """
+    This doesn't fully replace Streamlit's native theming, but it gives a clean
+    and consistent look across the app without requiring a restart.
+    """
 
-        if st is None:
-                return
+    if st is None:
+        return
 
-        mode = (theme_mode or "Dark").strip().lower()
-        if mode.startswith("light"):
-                st.markdown(
-                        """
+    mode = (theme_mode or "Dark").strip().lower()
+    if mode.startswith("light"):
+        st.markdown(
+            """
 <style>
 /* Light mode overrides */
 .stApp {
     background-color: #F7FBF8;
     color: #0B1F14;
+}
+
+/* Increase base readability */
+.stApp, .stApp p, .stApp li {
+    font-size: 1.02rem;
+    line-height: 1.55;
 }
 
 /* Main text (markdown + captions) */
@@ -403,6 +411,13 @@ def apply_app_theme(theme_mode: str) -> None:
 
 [data-testid="stCaptionContainer"] {
     color: rgba(11, 31, 20, 0.75);
+}
+
+/* Help text / small UI text */
+[data-testid="stHelp"],
+small,
+.stMarkdown small {
+    color: rgba(11, 31, 20, 0.80);
 }
 
 /* Widget labels */
@@ -429,11 +444,40 @@ div[data-baseweb="select"] > div {
     background-color: rgba(255,255,255,0.75);
 }
 
+input, textarea {
+    color: #0B1F14 !important;
+}
+
 /* Buttons */
 button[kind="primary"],
 button[kind="secondary"],
 button {
+    color: #0B1F14 !important;
+}
+
+/* Download buttons: make text + background clearly readable */
+div[data-testid="stDownloadButton"] button {
+    background: rgba(234, 245, 239, 0.95) !important;
+    border: 1px solid rgba(11, 31, 20, 0.18) !important;
+    color: #0B1F14 !important;
+    font-weight: 700 !important;
+}
+
+div[data-testid="stDownloadButton"] button:hover {
+    background: rgba(223, 240, 231, 0.98) !important;
+    border-color: rgba(11, 31, 20, 0.28) !important;
+}
+
+/* Links */
+a {
+    color: #146B3A;
+}
+
+code, pre {
     color: #0B1F14;
+    background: rgba(255,255,255,0.70);
+    border: 1px solid rgba(11, 31, 20, 0.10);
+    border-radius: 8px;
 }
 
 /* Dataframes */
@@ -450,18 +494,128 @@ div[data-testid="stMetric"] {
 }
 </style>
 """,
-                        unsafe_allow_html=True,
-                )
+            unsafe_allow_html=True,
+        )
+    else:
+        # Dark mode overrides (Streamlit defaults can be a bit low-contrast depending on browser/theme)
+        st.markdown(
+            """
+<style>
+.stApp {
+    background-color: #06130C;
+    color: #E8F5E9;
+}
+
+/* Increase base readability */
+.stApp, .stApp p, .stApp li {
+    font-size: 1.02rem;
+    line-height: 1.55;
+}
+
+/* Main text (markdown + captions) */
+[data-testid="stMarkdownContainer"],
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li {
+    color: #E8F5E9;
+}
+
+[data-testid="stCaptionContainer"] {
+    color: rgba(232, 245, 233, 0.78);
+}
+
+/* Help text / small UI text */
+[data-testid="stHelp"],
+small,
+.stMarkdown small {
+    color: rgba(232, 245, 233, 0.82);
+}
+
+/* Widget labels */
+[data-testid="stWidgetLabel"] {
+    color: #E8F5E9;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #0B2015;
+}
+
+[data-testid="stSidebar"] * {
+    color: #E8F5E9;
+}
+
+/* Headers */
+h1, h2, h3, h4, h5, h6 {
+    color: #E8F5E9;
+}
+
+/* Inputs */
+div[data-baseweb="select"] > div {
+    background-color: rgba(16, 42, 29, 0.55);
+}
+
+input, textarea {
+    color: #E8F5E9 !important;
+}
+
+/* Buttons */
+button[kind="primary"],
+button[kind="secondary"],
+button {
+    color: #E8F5E9 !important;
+}
+
+/* Download buttons: make text + background clearly readable */
+div[data-testid="stDownloadButton"] button {
+    background: rgba(46, 204, 113, 0.18) !important;
+    border: 1px solid rgba(232, 245, 233, 0.20) !important;
+    color: #E8F5E9 !important;
+    font-weight: 700 !important;
+}
+
+div[data-testid="stDownloadButton"] button:hover {
+    background: rgba(46, 204, 113, 0.26) !important;
+    border-color: rgba(232, 245, 233, 0.32) !important;
+}
+
+/* Links */
+a {
+    color: #7DCEA0;
+}
+
+code, pre {
+    color: #E8F5E9;
+    background: rgba(16,42,29,0.55);
+    border: 1px solid rgba(232, 245, 233, 0.10);
+    border-radius: 8px;
+}
+
+/* Dataframes */
+[data-testid="stDataFrame"] {
+    background-color: rgba(16, 42, 29, 0.35);
+}
+
+/* Metric cards */
+div[data-testid="stMetric"] {
+    background: rgba(16,42,29,0.45);
+    border: 1px solid rgba(232, 245, 233, 0.10);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+</style>
+""",
+            unsafe_allow_html=True,
+        )
 
 
 def _register_plotly_template(name: str, *, base_name: str, overlay_layout: go.Layout) -> None:
-        if name in pio.templates:
-                return
+    if name in pio.templates:
+        return
 
-        base = pio.templates[base_name] if base_name in pio.templates else None
-        tpl = go.layout.Template(base) if base is not None else go.layout.Template()
-        tpl.layout.update(overlay_layout)
-        pio.templates[name] = tpl
+    base = pio.templates[base_name] if base_name in pio.templates else None
+    tpl = go.layout.Template(base) if base is not None else go.layout.Template()
+    tpl.layout.update(overlay_layout)
+    pio.templates[name] = tpl
 
 
 def configure_plotly_theme(theme_mode: str | None = None) -> None:
@@ -473,13 +627,18 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#E8F5E9"),
+        # High-contrast qualitative palette so grouped traces are clearly distinguishable.
+        # (The earlier monochrome-green palette made categories hard to tell apart.)
         colorway=[
-            "#2ECC71",
-            "#27AE60",
-            "#A3E4D7",
-            "#58D68D",
-            "#1E8449",
-            "#52BE80",
+            "#2ECC71",  # green
+            "#3498DB",  # blue
+            "#E74C3C",  # red
+            "#F1C40F",  # yellow
+            "#9B59B6",  # purple
+            "#1ABC9C",  # teal
+            "#E67E22",  # orange
+            "#EC407A",  # pink
+            "#95A5A6",  # gray
         ],
         xaxis=dict(
             gridcolor="rgba(232,245,233,0.12)",
@@ -495,6 +654,13 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
             bgcolor="rgba(16,42,29,0.35)",
             bordercolor="rgba(232,245,233,0.10)",
             borderwidth=1,
+            title=dict(font=dict(color="#E8F5E9")),
+        ),
+        annotationdefaults=dict(
+            font=dict(color="#E8F5E9", size=12),
+            bgcolor="rgba(16,42,29,0.55)",
+            bordercolor="rgba(232,245,233,0.12)",
+            borderwidth=1,
         ),
         margin=dict(l=10, r=10, t=40, b=10),
     )
@@ -505,11 +671,14 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
         font=dict(color="#0B1F14"),
         colorway=[
             "#1E8449",
-            "#27AE60",
-            "#2ECC71",
-            "#16A085",
-            "#52BE80",
-            "#7DCEA0",
+            "#2980B9",
+            "#C0392B",
+            "#B7950B",
+            "#7D3C98",
+            "#117A65",
+            "#AF601A",
+            "#AD1457",
+            "#616A6B",
         ],
         xaxis=dict(
             gridcolor="rgba(11,31,20,0.10)",
@@ -524,6 +693,13 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
         legend=dict(
             bgcolor="rgba(234,245,239,0.70)",
             bordercolor="rgba(11,31,20,0.10)",
+            borderwidth=1,
+            title=dict(font=dict(color="#0B1F14")),
+        ),
+        annotationdefaults=dict(
+            font=dict(color="#0B1F14", size=12),
+            bgcolor="rgba(255,255,255,0.80)",
+            bordercolor="rgba(11,31,20,0.12)",
             borderwidth=1,
         ),
         margin=dict(l=10, r=10, t=40, b=10),
@@ -591,16 +767,18 @@ def download_dataframe(
     csv_kwargs: dict | None = None,
     excel_sheet_name: str = "data",
 ) -> None:
-    """Render CSV + Excel download buttons for a dataframe."""
+    """Render CSV + Excel + TXT download buttons for a dataframe."""
 
     if st is None:
         return
 
     csv_kwargs = csv_kwargs or {}
     csv_bytes = df.to_csv(index=False, **csv_kwargs).encode("utf-8")
+    # TXT export defaults to TSV for good readability + compatibility.
+    txt_bytes = df.to_csv(index=False, sep="\t").encode("utf-8")
     xlsx_bytes = dataframe_to_excel_bytes(df, sheet_name=excel_sheet_name)
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     with c1:
         st.download_button(
             f"{label} CSV",
@@ -615,5 +793,240 @@ def download_dataframe(
             data=xlsx_bytes,
             file_name=f"{file_stem}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with c3:
+        st.download_button(
+            f"{label} TXT",
+            data=txt_bytes,
+            file_name=f"{file_stem}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
+
+def _audience_slug(audience: str) -> str:
+    return (
+        (audience or "audience")
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+
+def _coerce_to_report_figures(
+    figures: Sequence[tuple[str, object]] | None,
+) -> list[tuple[str, go.Figure]]:
+    out: list[tuple[str, go.Figure]] = []
+    if not figures:
+        return out
+    for title, fig in figures:
+        if fig is None:
+            continue
+        if isinstance(fig, go.Figure):
+            out.append((title, fig))
+            continue
+        # Many plotly express figs are also go.Figure, but keep a defensive branch
+        if hasattr(fig, "to_plotly_json"):
+            out.append((title, go.Figure(fig)))
+            continue
+        raise TypeError(f"Unsupported figure type for report: {type(fig)!r}")
+    return out
+
+
+def build_plotly_html_report_bytes(
+    *,
+    title: str,
+    audience_markdown: dict[str, str],
+    theme_mode: str | None,
+    selected_audience: str | None,
+    figures: Sequence[tuple[str, object]] | None = None,
+    tables: Sequence[tuple[str, pd.DataFrame]] | None = None,
+    include_plotlyjs: str | bool = True,
+) -> bytes:
+    """Build a self-contained-ish HTML report including Plotly figures.
+
+    - If `selected_audience` is None, includes *all* audiences grouped.
+    - If provided, includes only that audience block.
+    - Plotly figures are embedded as interactive divs.
+    """
+
+    report_figs = _coerce_to_report_figures(figures)
+    report_tables = list(tables) if tables else []
+
+    mode = (theme_mode or "Dark").strip().lower()
+    is_light = mode.startswith("light")
+
+    bg = "#F7FBF8" if is_light else "#06130C"
+    fg = "#0B1F14" if is_light else "#E8F5E9"
+    muted = "rgba(11,31,20,0.72)" if is_light else "rgba(232,245,233,0.75)"
+    card = "rgba(255,255,255,0.65)" if is_light else "rgba(16,42,29,0.45)"
+    border = "rgba(11,31,20,0.12)" if is_light else "rgba(232,245,233,0.10)"
+    link = "#146B3A" if is_light else "#7DCEA0"
+
+    ts = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    def render_md_block(md: str) -> str:
+        # Avoid adding a markdown dependency; preserve readability with pre-wrap.
+        safe = html.escape(md or "")
+        return f'<div class="md">{safe}</div>'
+
+    def render_table(title_: str, df: pd.DataFrame) -> str:
+        try:
+            table_html = df.to_html(index=False, escape=True)
+        except Exception:
+            table_html = html.escape(str(df))
+            table_html = f"<pre>{table_html}</pre>"
+        return (
+            f"<section class='card'>"
+            f"<h3>{html.escape(title_)}</h3>"
+            f"<div class='table'>{table_html}</div>"
+            f"</section>"
+        )
+
+    # Build Plotly fragments; include plotlyjs only once.
+    plotly_fragments: list[str] = []
+    for i, (fig_title, fig) in enumerate(report_figs):
+        inc = include_plotlyjs if i == 0 else False
+        div = pio.to_html(fig, include_plotlyjs=inc, full_html=False)
+        plotly_fragments.append(
+            f"<section class='card'><h3>{html.escape(fig_title)}</h3>{div}</section>"
+        )
+
+    # Audience sections
+    audience_sections: list[tuple[str, str]]
+    if selected_audience:
+        audience_sections = [(selected_audience, audience_markdown.get(selected_audience, ""))]
+    else:
+        # Keep stable ordering
+        audience_sections = [(a, audience_markdown.get(a, "")) for a in AUDIENCE_OPTIONS]
+
+    audience_html = "".join(
+        (
+            f"<section class='card'>"
+            f"<h2>{html.escape(audience_name)}</h2>"
+            f"{render_md_block(md)}"
+            f"</section>"
+        )
+        for audience_name, md in audience_sections
+        if (md or "").strip()
+    )
+
+    tables_html = "".join(render_table(tname, tdf) for tname, tdf in report_tables if tdf is not None)
+
+    doc = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{html.escape(title)}</title>
+  <style>
+    :root {{
+      --bg: {bg};
+      --fg: {fg};
+      --muted: {muted};
+      --card: {card};
+      --border: {border};
+      --link: {link};
+    }}
+    body {{
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+    }}
+    a {{ color: var(--link); }}
+    .wrap {{ max-width: 1100px; margin: 0 auto; padding: 22px 18px; }}
+    header {{ margin-bottom: 14px; }}
+    h1 {{ margin: 0 0 6px 0; font-size: 1.7rem; }}
+    .meta {{ color: var(--muted); font-size: 0.95rem; }}
+    .grid {{ display: grid; grid-template-columns: 1fr; gap: 14px; }}
+    .card {{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 14px;
+      overflow-x: auto;
+    }}
+    h2 {{ margin: 0 0 8px 0; font-size: 1.25rem; }}
+    h3 {{ margin: 0 0 8px 0; font-size: 1.1rem; }}
+    .md {{ white-space: pre-wrap; }}
+    table {{ border-collapse: collapse; width: 100%; font-size: 0.95rem; }}
+    th, td {{ border: 1px solid var(--border); padding: 6px 8px; text-align: left; }}
+    th {{ background: rgba(0,0,0,0.06); }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>{html.escape(title)}</h1>
+      <div class="meta">Generated: {html.escape(ts)}{(' · Audience: ' + html.escape(selected_audience)) if selected_audience else ' · Grouped by audience'}</div>
+    </header>
+
+    <div class="grid">
+      {audience_html}
+      {''.join(plotly_fragments)}
+      {tables_html}
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return doc.encode("utf-8")
+
+
+def download_plotly_html_report(
+    *,
+    title: str,
+    file_stem: str,
+    audience: str,
+    audience_markdown: dict[str, str],
+    theme_mode: str | None,
+    figures: Sequence[tuple[str, object]] | None = None,
+    tables: Sequence[tuple[str, pd.DataFrame]] | None = None,
+    include_plotlyjs: str | bool = True,
+) -> None:
+    """Render download buttons for HTML reports (current audience + grouped)."""
+
+    if st is None:
+        return
+
+    safe_aud = _audience_slug(audience)
+    current_bytes = build_plotly_html_report_bytes(
+        title=title,
+        audience_markdown=audience_markdown,
+        theme_mode=theme_mode,
+        selected_audience=audience,
+        figures=figures,
+        tables=tables,
+        include_plotlyjs=include_plotlyjs,
+    )
+    grouped_bytes = build_plotly_html_report_bytes(
+        title=title,
+        audience_markdown=audience_markdown,
+        theme_mode=theme_mode,
+        selected_audience=None,
+        figures=figures,
+        tables=tables,
+        include_plotlyjs=include_plotlyjs,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            "Download report (current audience)",
+            data=current_bytes,
+            file_name=f"{file_stem}__{safe_aud}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+    with c2:
+        st.download_button(
+            "Download report (all audiences)",
+            data=grouped_bytes,
+            file_name=f"{file_stem}__all_audiences.html",
+            mime="text/html",
             use_container_width=True,
         )

@@ -8,6 +8,7 @@ from dashboard_utils import (
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
+    download_plotly_html_report,
     load_cleaned_dataset,
     render_audience_markdown,
     theme_selector,
@@ -25,28 +26,27 @@ df = load_cleaned_dataset()
 
 audience = audience_selector()
 
-render_audience_markdown(
-    {
-        "Non-technical": """
+AUDIENCE_MD = {
+    "Non-technical": """
 This page helps you *visually explore* patterns in the HR dataset.
 
 - Use **Univariate** to see how one field is distributed.
 - Use **Bivariate** to compare two fields (e.g., a factor vs attrition).
 """,
-        "Semi-technical": """
+    "Semi-technical": """
 Use this page for interactive exploratory data analysis (EDA) with Plotly.
 
 - Choose a column for **Univariate** distribution plots
 - Use **Bivariate** to explore relationships and potential predictors
 """,
-        "Technical": """
+    "Technical": """
 Interactive EDA with Plotly (hist/box/violin/scatter) and optional facets.
 
 Tip: use **color** + facets for quick stratified inspection before modeling.
 """,
-    },
-    audience=audience,
-)
+}
+
+render_audience_markdown(AUDIENCE_MD, audience=audience)
 
 all_cols = df.columns.tolist()
 numeric_cols = df.select_dtypes("number").columns.tolist()
@@ -77,6 +77,63 @@ with c5:
 with c6:
     st.caption("Tip: facets work best with categorical columns.")
 
+# If the user didn't pick a hue, default to the chosen target so group distinctions are visible.
+color_used = color
+if color_used is None and target in df.columns:
+    color_used = target
+
+# If color is a small-cardinality numeric column (e.g., 0/1), force discrete colors.
+plot_df = df
+color_col = color_used
+if color_col is not None and color_col in df.columns:
+    try:
+        nunique = int(df[color_col].nunique(dropna=False))
+    except Exception:
+        nunique = 999
+    if (color_col in numeric_cols) and nunique <= 12:
+        plot_df = df.copy()
+        plot_df["_color_group"] = plot_df[color_col].astype("Int64").astype(str)
+        color_col = "_color_group"
+
+grouping_summary = []
+if color_used:
+    grouping_summary.append(f"color={color_used}")
+if facet_col:
+    grouping_summary.append(f"facet_col={facet_col}")
+if facet_row:
+    grouping_summary.append(f"facet_row={facet_row}")
+st.caption(
+    "Grouping applied: " + (", ".join(grouping_summary) if grouping_summary else "(none)")
+)
+
+overlay_opacity = st.slider(
+    "Overlay opacity (when color is used)",
+    min_value=0.15,
+    max_value=0.95,
+    value=0.65,
+    step=0.05,
+    help="Lower opacity helps distinguish overlapping distributions when using color grouping.",
+)
+
+facet_col_spacing = 0.08 if facet_col else 0.04
+facet_row_spacing = 0.10 if facet_row else 0.06
+
+
+def _style_facet_annotations(fig) -> None:
+    try:
+        is_light = (theme_mode or "Dark").strip().lower().startswith("light")
+        fg = "#0B1F14" if is_light else "#E8F5E9"
+        bg = "rgba(255,255,255,0.80)" if is_light else "rgba(16,42,29,0.60)"
+        border = "rgba(11,31,20,0.14)" if is_light else "rgba(232,245,233,0.14)"
+
+        def _upd(a):
+            # Facet labels are annotations; style them like "facet strips".
+            a.update(font=dict(size=13, color=fg), bgcolor=bg, bordercolor=border, borderwidth=1)
+
+        fig.for_each_annotation(_upd)
+    except Exception:
+        return
+
 if plot_kind == "Univariate":
     left, right = st.columns([1, 2])
     with left:
@@ -91,39 +148,53 @@ if plot_kind == "Univariate":
     with right:
         if chart == "Histogram":
             fig = px.histogram(
-                df,
+                plot_df,
                 x=col,
-                color=color,
+                color=color_col,
                 facet_row=facet_row,
                 facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
                 nbins=nbins,
-                barmode="overlay" if color else "relative",
+                barmode="overlay" if color_col else "relative",
                 marginal="box",
             )
+            if color_col:
+                fig.update_traces(opacity=overlay_opacity)
         elif chart == "Box":
             fig = px.box(
-                df,
+                plot_df,
                 x=color if color in categorical_cols else None,
                 y=col,
-                color=color,
+                color=color_col,
                 facet_row=facet_row,
                 facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
                 points="outliers",
             )
         elif chart == "Violin":
             fig = px.violin(
-                df,
+                plot_df,
                 x=color if color in categorical_cols else None,
                 y=col,
-                color=color,
+                color=color_col,
                 facet_row=facet_row,
                 facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
                 box=True,
                 points="all",
             )
         else:
             counts = df[col].value_counts(dropna=False).rename_axis(col).reset_index(name="count")
             fig = px.bar(counts, x=col, y="count")
+
+        _style_facet_annotations(fig)
+
+        # Improve legend clarity when color grouping is active
+        if color_used:
+            fig.update_layout(legend_title_text=str(color_used))
 
         fig.update_layout(height=650)
         st.plotly_chart(fig, use_container_width=True)
@@ -134,17 +205,54 @@ else:
         x = st.selectbox("X", options=all_cols, index=all_cols.index(target) if target in all_cols else 0)
         y_candidates = [c for c in all_cols if c != x]
         y = st.selectbox("Y", options=y_candidates, index=0)
-        chart = st.selectbox("Chart", options=["Scatter", "Box", "Bar"], index=0)
+        chart = st.selectbox("Chart", options=["Scatter", "Box", "Bar", "Distribution"], index=0)
         trendline = "None"
         if chart == "Scatter" and x in numeric_cols and y in numeric_cols:
             trendline = st.selectbox("Trendline", options=["None", "OLS", "LOWESS"], index=0)
+
+        dist_var = None
+        if chart == "Distribution":
+            numeric_opts = [c for c in [y, x] if c in numeric_cols]
+            # Fall back to any numeric column if needed
+            if not numeric_opts:
+                numeric_opts = numeric_cols[:]
+            if numeric_opts:
+                dist_var = st.selectbox(
+                    "Distribution variable",
+                    options=numeric_opts,
+                    index=0,
+                    help="Histogram distribution plot. Use facets to split by groups (e.g., facet_col=X).",
+                )
         st.caption(
             "Scatter works best for numeric-numeric; Box is great for categorical vs numeric; "
-            "Bar aggregates by group (e.g., mean of Y by X)."
+            "Bar aggregates by group (e.g., mean of Y by X). Distribution shows a histogram for a numeric variable."
         )
 
     with right:
-        if chart == "Scatter":
+        if chart == "Distribution":
+            if dist_var is None or dist_var not in plot_df.columns:
+                st.info("Pick a numeric distribution variable to plot.")
+                fig = px.histogram(plot_df, x=y if y in numeric_cols else None)
+            else:
+                fig = px.histogram(
+                    plot_df,
+                    x=dist_var,
+                    color=color_col,
+                    facet_row=facet_row,
+                    facet_col=facet_col,
+                    facet_col_spacing=facet_col_spacing,
+                    facet_row_spacing=facet_row_spacing,
+                    nbins=40,
+                    barmode="overlay" if color_col else "relative",
+                    title=f"Distribution: {dist_var}",
+                )
+                if color_col:
+                    fig.update_traces(opacity=overlay_opacity)
+                _style_facet_annotations(fig)
+                if color_used:
+                    fig.update_layout(legend_title_text=str(color_used))
+
+        elif chart == "Scatter":
             trend = None
             if trendline == "OLS":
                 trend = "ols"
@@ -152,36 +260,103 @@ else:
                 trend = "lowess"
 
             fig = px.scatter(
-                df,
+                plot_df,
                 x=x,
                 y=y,
-                color=color,
+                color=color_col,
                 facet_row=facet_row,
                 facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
                 hover_data=[target] if target in df.columns else None,
                 trendline=trend,
+                trendline_scope="overall" if trend else None,
+                trendline_color_override="#F1C40F",
             )
+            # Style markers without affecting the trendline traces.
+            fig.update_traces(
+                marker=dict(size=7, opacity=0.82, line=dict(width=0)),
+                selector=dict(mode="markers"),
+            )
+
+            # Make the trendline highly visible.
+            if trend:
+                fig.update_traces(
+                    line=dict(width=4),
+                    selector=dict(mode="lines"),
+                )
         elif chart == "Box":
             fig = px.box(
-                df,
+                plot_df,
                 x=x,
                 y=y,
-                color=color,
+                color=color_col,
                 facet_row=facet_row,
                 facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
                 points="outliers",
             )
         else:
-            # Bar: aggregate mean(y) by x (works best when x is categorical)
+            # Bar:
+            # - If Y is numeric: aggregate mean(Y) by X and (optionally) color + facets.
+            # - If Y is categorical: count rows by X and Y (and facets).
             if y in numeric_cols:
-                agg = df.groupby(x, dropna=False)[y].mean().reset_index(name=f"mean_{y}")
-                fig = px.bar(agg, x=x, y=f"mean_{y}", color=color if color == x else None)
+                group_cols = [c for c in [facet_row, facet_col, x, color_col] if c]
+                group_cols = list(dict.fromkeys(group_cols))  # preserve order, drop duplicates
+
+                agg = (
+                    plot_df.groupby(group_cols, dropna=False)[y]
+                    .mean()
+                    .reset_index(name=f"mean_{y}")
+                )
+
+                fig = px.bar(
+                    agg,
+                    x=x,
+                    y=f"mean_{y}",
+                    color=color_col,
+                    facet_row=facet_row,
+                    facet_col=facet_col,
+                    facet_col_spacing=facet_col_spacing,
+                    facet_row_spacing=facet_row_spacing,
+                    barmode="group" if color_col else "relative",
+                )
             else:
-                ct = df.groupby([x, y], dropna=False).size().reset_index(name="count")
-                fig = px.bar(ct, x=x, y="count", color=y, barmode="group")
+                group_cols = [c for c in [facet_row, facet_col, x, y] if c]
+                group_cols = list(dict.fromkeys(group_cols))
+
+                ct = plot_df.groupby(group_cols, dropna=False).size().reset_index(name="count")
+                fig = px.bar(
+                    ct,
+                    x=x,
+                    y="count",
+                    color=y,
+                    facet_row=facet_row,
+                    facet_col=facet_col,
+                    facet_col_spacing=facet_col_spacing,
+                    facet_row_spacing=facet_row_spacing,
+                    barmode="group",
+                )
+
+        _style_facet_annotations(fig)
+
+        if color_used:
+            fig.update_layout(legend_title_text=str(color_used))
 
         fig.update_layout(height=650)
         st.plotly_chart(fig, use_container_width=True)
+
+st.subheader("Download page report (HTML)")
+download_plotly_html_report(
+    title="EDA — Univariate & Bivariate (Plotly)",
+    file_stem="report_eda",
+    audience=audience,
+    audience_markdown=AUDIENCE_MD,
+    theme_mode=theme_mode,
+    figures=[("Selected chart", fig)],
+    tables=[("Dataset preview (first 50 rows)", df.head(50))],
+)
 
 st.subheader("Dataset preview")
 st.dataframe(df.head(20), use_container_width=True)
