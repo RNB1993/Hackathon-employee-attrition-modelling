@@ -9,6 +9,7 @@ import streamlit as st
 from dashboard_utils import (
     MODEL_CANDIDATES,
     apply_app_theme,
+    apply_global_filters,
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
@@ -31,7 +32,8 @@ configure_plotly_theme(theme_mode)
 
 st.title("Prediction — Attrition Probability")
 
-base_df = load_cleaned_dataset()
+base_df_full = load_cleaned_dataset()
+base_df = apply_global_filters(base_df_full)
 
 audience = audience_selector()
 
@@ -148,7 +150,9 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure 
 
 
 pipe = _get_pipe(model_label)
-mapping = interaction_mapping(base_df)
+# IMPORTANT: keep mapping stable by deriving it from the full dataset,
+# not a filtered view (filters are for exploration, not redefining features).
+mapping = interaction_mapping(base_df_full)
 required_raw_numeric = sorted(
     set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist())
 )
@@ -233,7 +237,7 @@ score_group = st.button("Score filtered group", type="secondary")
 group_out = None
 if score_group:
     try:
-        group_out = predict_proba_attrition(model_label, filtered, dataset_for_mapping=base_df)
+        group_out = predict_proba_attrition(model_label, filtered, dataset_for_mapping=base_df_full)
         st.success("Group predictions computed.")
 
         group_color = "Attrition" if "Attrition" in group_out.columns else None
@@ -359,7 +363,7 @@ if override_cols:
     st.dataframe(row, use_container_width=True)
 
 try:
-    pred_row = predict_proba_attrition(model_label, row, dataset_for_mapping=base_df)
+    pred_row = predict_proba_attrition(model_label, row, dataset_for_mapping=base_df_full)
     st.success("Prediction computed.")
     proba = float(pred_row["pred_attrition_proba"].iloc[0])
     st.metric("Predicted attrition probability", f"{proba:.1%}")
@@ -494,7 +498,7 @@ if uploaded is not None:
             st.stop()
 
     try:
-        out = predict_proba_attrition(model_label, up, dataset_for_mapping=base_df)
+        out = predict_proba_attrition(model_label, up, dataset_for_mapping=base_df_full)
         st.success("Predictions computed.")
         st.dataframe(out[["pred_attrition_proba", "pred_attrition_label"]].head(50), use_container_width=True)
 

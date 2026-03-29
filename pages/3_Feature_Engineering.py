@@ -5,6 +5,7 @@ import streamlit as st
 
 from dashboard_utils import (
     apply_app_theme,
+    apply_global_filters,
     audience_selector,
     configure_plotly_theme,
     correlation_pairs,
@@ -27,6 +28,7 @@ configure_plotly_theme(theme_mode)
 st.title("Feature Engineering — Correlations & Interactions")
 
 df = load_cleaned_dataset()
+df = apply_global_filters(df)
 num = numeric_df(df)
 
 audience = audience_selector()
