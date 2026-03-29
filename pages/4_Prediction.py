@@ -127,7 +127,7 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure 
         except Exception:
             pass
         fig.update_layout(height=320, margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         state = {
             "chart": "Histogram",
@@ -159,7 +159,7 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure 
             title=f"{feature} counts",
         )
         fig.update_layout(height=320, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         state = {
             "chart": "Bar",
@@ -256,7 +256,7 @@ if len(filtered) == 0:
     st.warning("No employees match the current filters. Widen filters to continue.")
     st.stop()
 
-st.dataframe(filtered.head(30), use_container_width=True)
+st.dataframe(filtered.head(30), width="stretch")
 
 st.markdown("### Score the filtered group (optional)")
 score_group = st.button("Score filtered group", type="secondary")
@@ -301,7 +301,7 @@ if score_group:
             except Exception:
                 pass
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         group_state = {
             "chart": "Histogram",
@@ -332,7 +332,7 @@ if score_group:
                 }
                 mfig = metrics_bar_figure(metrics, title="Group scoring summary")
                 mfig.update_layout(yaxis_tickformat=",.0%")
-                st.plotly_chart(mfig, use_container_width=True)
+                st.plotly_chart(mfig, width="stretch")
             except Exception:
                 pass
 
@@ -398,7 +398,7 @@ if st.session_state.get("row_overrides_row_key") != row_key:
     st.session_state["row_overrides_row_key"] = row_key
 
 st.write("Selected row (raw):")
-st.dataframe(row_base, use_container_width=True)
+st.dataframe(row_base, width="stretch")
 
 st.markdown("### Key in edits (override features)")
 editable_cols = [c for c in base_df.columns if c not in {"Attrition"}]
@@ -445,7 +445,7 @@ if override_cols:
 
 if override_cols:
     st.write("Row after overrides:")
-    st.dataframe(row, use_container_width=True)
+    st.dataframe(row, width="stretch")
 
 try:
     pred_row = predict_proba_attrition(model_label, row, dataset_for_mapping=base_df_full)
@@ -460,7 +460,7 @@ try:
     )
     if show_metrics_plot:
         gfig = probability_indicator_figure(proba, title="Predicted attrition probability", threshold=0.5)
-        st.plotly_chart(gfig, use_container_width=True)
+        st.plotly_chart(gfig, width="stretch")
         gauge_state = {
             "chart": "Gauge",
             "title": "Predicted attrition probability",
@@ -472,7 +472,7 @@ try:
         gauge_state["short_description"] = short_plot_state_description(gauge_state)
         if gauge_state["short_description"]:
             st.caption(f"Plot summary: {gauge_state['short_description']}")
-    st.dataframe(pred_row[["pred_attrition_proba", "pred_attrition_label"]], use_container_width=True)
+    st.dataframe(pred_row[["pred_attrition_proba", "pred_attrition_label"]], width="stretch")
 
     st.subheader("Download prediction")
     st.caption("Choose a format: CSV / Excel / TXT.")
@@ -538,7 +538,7 @@ try:
                 height=380,
                 margin=dict(l=10, r=10, t=10, b=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             sens_state = {
                 "chart": "Line",
                 "title": "What-if sensitivity (numeric feature)",
@@ -563,7 +563,7 @@ try:
             plot_df = pd.DataFrame({f: cats, "pred_attrition_proba": probs})
             fig = px.bar(plot_df, x=f, y="pred_attrition_proba")
             fig.update_layout(yaxis_tickformat=",.0%", height=380, margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             sens_state = {
                 "chart": "Bar",
                 "title": "What-if sensitivity (categorical feature)",
@@ -619,7 +619,7 @@ uploaded = st.file_uploader("Upload a CSV", type=["csv"])
 if uploaded is not None:
     up = pd.read_csv(uploaded)
     st.write("Uploaded preview:")
-    st.dataframe(up.head(20), use_container_width=True)
+    st.dataframe(up.head(20), width="stretch")
 
     already_engineered = any(
         c.startswith("inter_pos_") or c.startswith("inter_neg_") for c in up.columns
@@ -638,7 +638,7 @@ if uploaded is not None:
     try:
         out = predict_proba_attrition(model_label, up, dataset_for_mapping=base_df_full)
         st.success("Predictions computed.")
-        st.dataframe(out[["pred_attrition_proba", "pred_attrition_label"]].head(50), use_container_width=True)
+        st.dataframe(out[["pred_attrition_proba", "pred_attrition_label"]].head(50), width="stretch")
 
         batch_color = "Attrition" if "Attrition" in out.columns else None
         if batch_color:
@@ -670,7 +670,7 @@ if uploaded is not None:
             except Exception:
                 pass
 
-        st.plotly_chart(dist, use_container_width=True)
+        st.plotly_chart(dist, width="stretch")
 
         batch_state = {
             "chart": "Histogram",
@@ -701,7 +701,7 @@ if uploaded is not None:
                 }
                 mfig = metrics_bar_figure(metrics, title="Batch scoring summary")
                 mfig.update_layout(yaxis_tickformat=",.0%")
-                st.plotly_chart(mfig, use_container_width=True)
+                st.plotly_chart(mfig, width="stretch")
             except Exception:
                 pass
 

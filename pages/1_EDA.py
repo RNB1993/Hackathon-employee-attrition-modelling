@@ -296,7 +296,7 @@ if plot_kind == "Univariate":
             fig.update_layout(legend_title_text=str(color_used))
 
         fig.update_layout(height=650)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 else:
     left, right = st.columns([1, 2])
@@ -469,7 +469,7 @@ else:
             fig.update_layout(legend_title_text=str(color_used))
 
         fig.update_layout(height=650)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 st.subheader("Download page report (HTML)")
 st.caption("Interactive HTML report (includes the selected chart and key tables).")
@@ -511,7 +511,7 @@ download_plotly_html_report(
 )
 
 st.subheader("Dataset preview")
-st.dataframe(df.head(20), use_container_width=True)
+st.dataframe(df.head(20), width="stretch")
 
 st.subheader("Download dataset")
 st.caption("Choose a format: CSV / Excel / TXT.")

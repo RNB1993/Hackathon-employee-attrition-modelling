@@ -957,7 +957,7 @@ def download_dataframe(
             data=csv_bytes,
             file_name=f"{file_stem}.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
     with c2:
         st.download_button(
@@ -965,7 +965,7 @@ def download_dataframe(
             data=xlsx_bytes,
             file_name=f"{file_stem}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width="stretch",
         )
     with c3:
         st.download_button(
@@ -973,7 +973,7 @@ def download_dataframe(
             data=txt_bytes,
             file_name=f"{file_stem}.txt",
             mime="text/plain",
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -1418,7 +1418,7 @@ def download_plotly_html_report(
             data=current_bytes,
             file_name=f"{file_stem}__{safe_aud}.html",
             mime="text/html",
-            use_container_width=True,
+            width="stretch",
         )
     with c2:
         st.download_button(
@@ -1426,7 +1426,7 @@ def download_plotly_html_report(
             data=grouped_bytes,
             file_name=f"{file_stem}__all_audiences.html",
             mime="text/html",
-            use_container_width=True,
+            width="stretch",
         )
 
     # Optional: provide the same tables as CSV/XLSX/TXT.

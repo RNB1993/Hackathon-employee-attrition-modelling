@@ -186,7 +186,7 @@ if test_kind.startswith("Numeric"):
     }
     plot_state["short_description"] = short_plot_state_description(plot_state)
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     if plot_state["short_description"]:
         st.caption(f"Plot summary: {plot_state['short_description']}")
     report_fig = fig
@@ -256,7 +256,7 @@ if test_kind.startswith("Numeric"):
             },
             title="Key test metrics",
         )
-        st.plotly_chart(mfig, use_container_width=True)
+        st.plotly_chart(mfig, width="stretch")
 
     report_tables.append(("Test results", pd.DataFrame([results])))
 
@@ -279,7 +279,7 @@ else:
     cramers_v = np.sqrt(phi2 / max(1, min(k - 1, r - 1)))
 
     st.subheader("Contingency table")
-    st.dataframe(ct, use_container_width=True)
+    st.dataframe(ct, width="stretch")
 
     report_tables.append(("Contingency table", ct.reset_index()))
 
@@ -323,7 +323,7 @@ else:
             },
             title="Chi-square summary metrics",
         )
-        st.plotly_chart(mfig, use_container_width=True)
+        st.plotly_chart(mfig, width="stretch")
     st.caption("Choose a format: CSV / Excel / TXT.")
     download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
 
@@ -344,7 +344,7 @@ else:
     plot_df["_target_group"] = plot_df["target"].astype(str)
     fig = px.bar(plot_df, x=cat, y="count", color="_target_group", barmode="group")
     fig.update_layout(legend_title_text=str(target_display_name or target_col))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     if report_settings.get("short_description"):
         st.caption(f"Plot summary: {report_settings['short_description']}")
     report_fig = fig

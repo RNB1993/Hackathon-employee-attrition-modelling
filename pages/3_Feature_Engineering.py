@@ -89,7 +89,7 @@ fig = px.imshow(
     aspect="auto",
 )
 fig.update_layout(height=650)
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 heatmap_state = {
     "chart": "Heatmap",
@@ -104,20 +104,20 @@ if heatmap_state["short_description"]:
 st.subheader("Top correlated pairs")
 pairs = correlation_pairs(df)
 filtered = pairs[(pairs["spearman_r"].abs() >= abs_r_min)].copy().head(top_n)
-st.dataframe(filtered, use_container_width=True)
+st.dataframe(filtered, width="stretch")
 _download_caption()
 download_dataframe(filtered, file_stem="correlation_pairs_filtered", label="Download table")
 
 st.subheader("Interaction feature mapping")
 map_df = interaction_mapping(df)
 st.caption("This maps each engineered `inter_pos_*` / `inter_neg_*` to its raw numeric feature pair.")
-st.dataframe(map_df.head(50), use_container_width=True)
+st.dataframe(map_df.head(50), width="stretch")
 _download_caption()
 download_dataframe(map_df, file_stem="interaction_mapping", label="Download mapping")
 
 st.subheader("Top interaction predictors (from saved model)")
 imp = interaction_importance_table(model_label=model_label, dataset_for_mapping=df, top_n=25)
-st.dataframe(imp, use_container_width=True)
+st.dataframe(imp, width="stretch")
 _download_caption()
 download_dataframe(imp, file_stem="interaction_importance_top25", label="Download ranking")
 
@@ -130,7 +130,7 @@ fig2 = px.bar(
     hover_data=["raw_feature_1", "raw_feature_2", "spearman_r", "odds_ratio"],
 )
 fig2.update_layout(height=700)
-st.plotly_chart(fig2, use_container_width=True)
+st.plotly_chart(fig2, width="stretch")
 
 bar_state = {
     "chart": "Bar",
