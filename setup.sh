@@ -8,5 +8,6 @@ headless = true\n\
 address = \"0.0.0.0\"\n\
 port = $PORT\n\
 enableCORS = false\n\
+enableXsrfProtection = false\n\
 \n\
 " > ~/.streamlit/config.toml
