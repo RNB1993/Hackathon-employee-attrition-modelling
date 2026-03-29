@@ -12,6 +12,7 @@ from dashboard_utils import (
     audience_selector,
     configure_plotly_theme,
     download_dataframe,
+    download_plotly_html_report,
     engineer_interactions,
     ensure_required_columns,
     interaction_mapping,
@@ -37,29 +38,41 @@ audience = audience_selector()
 with st.sidebar:
     st.header("Model")
     model_label = st.selectbox("Choose model", list(MODEL_CANDIDATES.keys()))
+    try:
+        st.caption(f"Model file: {MODEL_CANDIDATES[model_label].name}")
+    except Exception:
+        pass
 
-render_audience_markdown(
-    {
-        "Non-technical": """
+AUDIENCE_MD = {
+    "Non-technical": """
 This page estimates **attrition risk** as a probability.
 
 - Higher probability means the profile is more similar to employees who left in the historical data.
 - Use this to *triage and explore*, not as a final decision.
 """,
-        "Semi-technical": """
+    "Semi-technical": """
 Predict attrition probability using the saved model pipeline.
 
 You can:
 - start from an existing employee record, then **key in edits**
 - upload a CSV to score many employees
 """,
-        "Technical": """
+    "Technical": """
 Model scoring page (sklearn Pipeline). Features are engineered interaction terms derived from Spearman correlation pairs.
 
 Includes scenario analysis (one-feature sensitivity) using the same feature engineering pipeline.
 """,
-    },
-    audience=audience,
+}
+
+render_audience_markdown(AUDIENCE_MD, audience=audience)
+
+overlay_opacity = st.sidebar.slider(
+    "Overlay opacity (grouped histograms)",
+    min_value=0.15,
+    max_value=0.95,
+    value=0.65,
+    step=0.05,
+    help="Lower opacity makes overlapping groups easier to distinguish.",
 )
 
 
@@ -75,14 +88,26 @@ def _predict_proba_from_raw(raw_df: pd.DataFrame, *, pipe, mapping: pd.DataFrame
     return pipe.predict_proba(X)[:, 1]
 
 
-def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> None:
+def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure | None:
     if feature not in base.columns:
         st.info(f"No plot available: missing column {feature}")
-        return
+        return None
 
     s = base[feature]
     if pd.api.types.is_numeric_dtype(s):
-        fig = px.histogram(base, x=feature, nbins=30, title=f"{feature} distribution")
+        # Default to grouping by Attrition when available so the distribution shows distinctions.
+        color_col = "Attrition" if "Attrition" in base.columns else None
+        fig = px.histogram(
+            base,
+            x=feature,
+            color=color_col,
+            nbins=30,
+            barmode="overlay" if color_col else "relative",
+            title=f"{feature} distribution" + (" (grouped by Attrition)" if color_col else ""),
+        )
+        if color_col:
+            fig.update_traces(opacity=overlay_opacity)
+            fig.update_layout(legend_title_text=color_col)
         try:
             fig.add_vline(x=float(value), line_width=3, line_dash="dash", line_color="red")
         except Exception:
@@ -95,6 +120,7 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> None:
             st.caption(f"Entered value percentile (approx): {pct:.0%}")
         except Exception:
             pass
+        return fig
     else:
         counts = s.astype(str).fillna("(missing)").value_counts().reset_index()
         counts.columns = [feature, "count"]
@@ -109,6 +135,7 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> None:
         )
         fig.update_layout(height=320, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
+        return fig
 
 
 pipe = _get_pipe(model_label)
@@ -200,12 +227,21 @@ if score_group:
         group_out = predict_proba_attrition(model_label, filtered, dataset_for_mapping=base_df)
         st.success("Group predictions computed.")
 
+        group_color = "Attrition" if "Attrition" in group_out.columns else None
+        if group_color:
+            st.caption("Grouped by: Attrition")
+
         fig = px.histogram(
             group_out,
             x="pred_attrition_proba",
+            color=group_color,
             nbins=30,
+            barmode="overlay" if group_color else "relative",
             title="Predicted attrition probability — filtered group",
         )
+        if group_color:
+            fig.update_traces(opacity=overlay_opacity)
+            fig.update_layout(legend_title_text=group_color)
         fig.update_layout(
             xaxis_tickformat=",.0%",
             height=320,
@@ -215,6 +251,26 @@ if score_group:
 
         st.subheader("Download group predictions")
         download_dataframe(group_out, file_stem="filtered_group_predictions", label="Download")
+
+        st.subheader("Download group report (HTML)")
+        summary = (
+            group_out[["pred_attrition_proba"]]
+            .describe(percentiles=[0.05, 0.25, 0.5, 0.75, 0.95])
+            .reset_index()
+            .rename(columns={"index": "metric"})
+        )
+        download_plotly_html_report(
+            title=f"Prediction — Group Scoring ({model_label})",
+            file_stem="report_prediction_group",
+            audience=audience,
+            audience_markdown=AUDIENCE_MD,
+            theme_mode=theme_mode,
+            figures=[("Group probability distribution", fig)],
+            tables=[
+                ("Summary stats", summary),
+                ("Predictions (first 200 rows)", group_out.head(200)),
+            ],
+        )
     except Exception as e:
         st.error(f"Group prediction failed: {e}")
 
@@ -310,12 +366,16 @@ try:
         help="If you overrode features above, those are suggested here.",
     )
 
+    context_figs: list[tuple[str, object]] = []
+
     if not features_to_plot:
         st.info("Select one or more features to see input-dependent plots.")
     else:
         for feat in features_to_plot:
             st.markdown(f"#### {feat}")
-            _plot_feature_context(base_df, feat, row.iloc[0][feat])
+            fig_ctx = _plot_feature_context(base_df, feat, row.iloc[0][feat])
+            if fig_ctx is not None:
+                context_figs.append((f"Feature context — {feat}", fig_ctx))
 
     st.subheader("What-if sensitivity (change one feature)")
     sens_numeric = [c for c in features_to_plot if c in numeric_cols]
@@ -327,6 +387,8 @@ try:
         index=0,
         help="Plots how the predicted probability changes when one feature changes and all others are held constant.",
     )
+
+    sens_fig = None
 
     if sens_kind == "Numeric feature":
         if not sens_numeric:
@@ -356,6 +418,7 @@ try:
                 margin=dict(l=10, r=10, t=10, b=10),
             )
             st.plotly_chart(fig, use_container_width=True)
+            sens_fig = fig
     else:
         if not sens_categorical:
             st.info("Pick at least one categorical feature in the visualization selector above.")
@@ -369,6 +432,27 @@ try:
             fig = px.bar(plot_df, x=f, y="pred_attrition_proba")
             fig.update_layout(yaxis_tickformat=",.0%", height=380, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig, use_container_width=True)
+            sens_fig = fig
+
+    st.subheader("Download prediction report (HTML)")
+    report_figs: list[tuple[str, object]] = []
+    report_figs.extend(context_figs)
+    if sens_fig is not None:
+        report_figs.append(("What-if sensitivity", sens_fig))
+
+    download_plotly_html_report(
+        title=f"Prediction — Single Employee ({model_label})",
+        file_stem="report_prediction_single",
+        audience=audience,
+        audience_markdown=AUDIENCE_MD,
+        theme_mode=theme_mode,
+        figures=report_figs if report_figs else None,
+        tables=[
+            ("Input row (raw)", row_base.reset_index(drop=True)),
+            ("Input row (after overrides)", row.reset_index(drop=True)),
+            ("Prediction output", pred_row.reset_index(drop=True)),
+        ],
+    )
 except Exception as e:
     st.error(f"Prediction failed: {e}")
 
@@ -401,8 +485,45 @@ if uploaded is not None:
         st.success("Predictions computed.")
         st.dataframe(out[["pred_attrition_proba", "pred_attrition_label"]].head(50), use_container_width=True)
 
+        batch_color = "Attrition" if "Attrition" in out.columns else None
+        if batch_color:
+            st.caption("Grouped by: Attrition")
+        dist = px.histogram(
+            out,
+            x="pred_attrition_proba",
+            color=batch_color,
+            nbins=30,
+            barmode="overlay" if batch_color else "relative",
+            title="Predicted probability distribution",
+        )
+        if batch_color:
+            dist.update_traces(opacity=overlay_opacity)
+            dist.update_layout(legend_title_text=batch_color)
+        dist.update_layout(xaxis_tickformat=",.0%", height=320, margin=dict(l=10, r=10, t=40, b=10))
+        st.plotly_chart(dist, use_container_width=True)
+
         st.subheader("Download predictions")
         download_dataframe(out, file_stem="attrition_predictions", label="Download")
+
+        st.subheader("Download batch report (HTML)")
+        summary = (
+            out[["pred_attrition_proba"]]
+            .describe(percentiles=[0.05, 0.25, 0.5, 0.75, 0.95])
+            .reset_index()
+            .rename(columns={"index": "metric"})
+        )
+        download_plotly_html_report(
+            title=f"Prediction — Batch Scoring ({model_label})",
+            file_stem="report_prediction_batch",
+            audience=audience,
+            audience_markdown=AUDIENCE_MD,
+            theme_mode=theme_mode,
+            figures=[("Batch probability distribution", dist)],
+            tables=[
+                ("Summary stats", summary),
+                ("Predictions (first 200 rows)", out.head(200)),
+            ],
+        )
 
         st.subheader("Inspect one scored row (plots depend on selected features)")
         idx = st.number_input(

@@ -9,6 +9,7 @@ from dashboard_utils import (
     configure_plotly_theme,
     correlation_pairs,
     download_dataframe,
+    download_plotly_html_report,
     interaction_importance_table,
     interaction_mapping,
     load_cleaned_dataset,
@@ -30,20 +31,19 @@ num = numeric_df(df)
 
 audience = audience_selector()
 
-render_audience_markdown(
-    {
-        "Non-technical": """
+AUDIENCE_MD = {
+    "Non-technical": """
 This page shows which factors tend to move together and how we built extra *combined* features.
 
 These patterns can suggest which levers matter, but correlation does not prove cause.
 """,
-        "Semi-technical": """
+    "Semi-technical": """
 Correlation view + engineered interaction features used by the prediction model.
 
 - Heatmap: Spearman correlation (numeric)
 - Interaction mapping: how new features were constructed
 """,
-        "Technical": """
+    "Technical": """
 Feature engineering audit:
 
 - Spearman correlation matrix
@@ -51,9 +51,9 @@ Feature engineering audit:
 - Interaction mapping to raw feature pairs
 - Model coefficient ranking for interaction features
 """,
-    },
-    audience=audience,
-)
+}
+
+render_audience_markdown(AUDIENCE_MD, audience=audience)
 
 with st.sidebar:
     st.header("Controls")
@@ -101,3 +101,21 @@ fig2 = px.bar(
 )
 fig2.update_layout(height=700)
 st.plotly_chart(fig2, use_container_width=True)
+
+st.subheader("Download page report (HTML)")
+download_plotly_html_report(
+    title="Feature Engineering — Correlations & Interactions",
+    file_stem="report_feature_engineering",
+    audience=audience,
+    audience_markdown=AUDIENCE_MD,
+    theme_mode=theme_mode,
+    figures=[
+        ("Spearman correlation heatmap", fig),
+        ("Top interaction predictors", fig2),
+    ],
+    tables=[
+        ("Top correlated pairs (filtered)", filtered),
+        ("Interaction mapping (first 200 rows)", map_df.head(200)),
+        ("Interaction importance (top 25)", imp),
+    ],
+)
