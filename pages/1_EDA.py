@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -103,7 +104,19 @@ if color_col is not None and color_col in df.columns:
         nunique = 999
     if (color_col in numeric_cols) and nunique <= 12:
         plot_df = df.copy()
-        plot_df["_color_group"] = plot_df[color_col].astype("Int64").astype(str)
+        # Prefer human-readable labels for common binary encodings.
+        try:
+            vals = set(pd.to_numeric(plot_df[color_col], errors="coerce").dropna().unique().tolist())
+        except Exception:
+            vals = set()
+        if vals.issubset({0.0, 1.0}):
+            plot_df["_color_group"] = (
+                pd.to_numeric(plot_df[color_col], errors="coerce")
+                .map({0.0: "No", 1.0: "Yes"})
+                .fillna("(missing)")
+            )
+        else:
+            plot_df["_color_group"] = plot_df[color_col].astype("Int64").astype(str)
         color_col = "_color_group"
 
 
@@ -145,6 +158,53 @@ overlay_opacity = st.slider(
     step=0.05,
     help="Lower opacity helps distinguish overlapping distributions when using color grouping.",
 )
+
+show_summary_lines = st.checkbox(
+    "Show summary reference lines",
+    value=False,
+    help="Adds mean/median reference lines to help interpret distributions and scatter plots.",
+)
+summary_lines = []
+if show_summary_lines:
+    summary_lines = st.multiselect(
+        "Summary lines",
+        options=["Mean", "Median"],
+        default=["Mean"],
+        help="Shown as vertical (distribution) or vertical+horizontal (scatter) lines.",
+    )
+
+
+def _add_vlines(fig, s, *, title_prefix: str = "") -> None:
+    try:
+        ser = pd.to_numeric(s, errors="coerce").dropna()
+        if ser.empty:
+            return
+        if "Mean" in summary_lines:
+            m = float(ser.mean())
+            fig.add_vline(x=m, line_width=3, line_dash="dash", line_color="#D62728")
+            fig.add_annotation(x=m, y=1.02, xref="x", yref="paper", text=f"{title_prefix}mean", showarrow=False)
+        if "Median" in summary_lines:
+            med = float(ser.median())
+            fig.add_vline(x=med, line_width=3, line_dash="dot", line_color="#1F77B4")
+            fig.add_annotation(x=med, y=1.06, xref="x", yref="paper", text=f"{title_prefix}median", showarrow=False)
+    except Exception:
+        return
+
+
+def _add_scatter_mean_lines(fig, *, x_series, y_series) -> None:
+    try:
+        xs = pd.to_numeric(x_series, errors="coerce").dropna()
+        ys = pd.to_numeric(y_series, errors="coerce").dropna()
+        if xs.empty or ys.empty:
+            return
+        if "Mean" in summary_lines:
+            fig.add_vline(x=float(xs.mean()), line_width=2, line_dash="dash", line_color="rgba(214,39,40,0.85)")
+            fig.add_hline(y=float(ys.mean()), line_width=2, line_dash="dash", line_color="rgba(214,39,40,0.85)")
+        if "Median" in summary_lines:
+            fig.add_vline(x=float(xs.median()), line_width=2, line_dash="dot", line_color="rgba(31,119,180,0.85)")
+            fig.add_hline(y=float(ys.median()), line_width=2, line_dash="dot", line_color="rgba(31,119,180,0.85)")
+    except Exception:
+        return
 
 facet_col_spacing = 0.08 if facet_col else 0.04
 facet_row_spacing = 0.10 if facet_row else 0.06
@@ -192,6 +252,8 @@ if plot_kind == "Univariate":
             )
             if color_col:
                 fig.update_traces(opacity=overlay_opacity)
+            if show_summary_lines and summary_lines:
+                _add_vlines(fig, plot_df[col])
         elif chart == "Box":
             fig = px.box(
                 plot_df,
@@ -204,6 +266,11 @@ if plot_kind == "Univariate":
                 facet_row_spacing=facet_row_spacing,
                 points="outliers",
             )
+            if show_summary_lines and "Mean" in summary_lines:
+                try:
+                    fig.update_traces(boxmean=True)
+                except Exception:
+                    pass
         elif chart == "Violin":
             fig = px.violin(
                 plot_df,
@@ -288,6 +355,8 @@ else:
                 )
                 if color_col:
                     fig.update_traces(opacity=overlay_opacity)
+                if show_summary_lines and summary_lines:
+                    _add_vlines(fig, plot_df[dist_var])
                 _style_facet_annotations(fig)
                 if color_used:
                     fig.update_layout(legend_title_text=str(color_used))
@@ -325,6 +394,8 @@ else:
                     line=dict(width=4),
                     selector=dict(mode="lines"),
                 )
+            if show_summary_lines and summary_lines:
+                _add_scatter_mean_lines(fig, x_series=plot_df[x], y_series=plot_df[y])
         elif chart == "Box":
             fig = px.box(
                 plot_df,
@@ -401,6 +472,24 @@ else:
 
 st.subheader("Download page report (HTML)")
 st.caption("Interactive HTML report (includes the selected chart and key tables).")
+
+chart_settings = {
+    "plot_kind": plot_kind,
+    "chart": chart,
+    "x": (col if plot_kind == "Univariate" else x),
+    "y": (None if plot_kind == "Univariate" else y),
+    "color": color_used,
+    "facet_col": facet_col,
+    "facet_row": facet_row,
+    "bar_aggregation": (bar_agg if (plot_kind == "Bivariate" and chart == "Bar" and y in numeric_cols) else None),
+    "trendline": (trendline if (plot_kind == "Bivariate" and chart == "Scatter") else None),
+    "summary_lines": ", ".join(summary_lines) if summary_lines else "(none)",
+    "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+}
+chart_settings_df = pd.DataFrame(
+    [{"setting": k, "value": "" if v is None else str(v)} for k, v in chart_settings.items()]
+)
+
 download_plotly_html_report(
     title="EDA — Univariate & Bivariate (Plotly)",
     file_stem="report_eda",
@@ -408,7 +497,10 @@ download_plotly_html_report(
     audience_markdown=AUDIENCE_MD,
     theme_mode=theme_mode,
     figures=[("Selected chart", fig)],
-    tables=[("Dataset preview (first 50 rows)", df.head(50))],
+    tables=[
+        ("Chart description / settings", chart_settings_df),
+        ("Dataset preview (first 50 rows)", df.head(50)),
+    ],
 )
 
 st.subheader("Dataset preview")
