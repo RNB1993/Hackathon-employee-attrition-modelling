@@ -1,8 +1,6 @@
 # Exclude heavy notebooks from the Heroku slug...
-jupyter_notebooks/*
-
-# ...but keep the trained model artifacts needed by the Streamlit Prediction page.
-!jupyter_notebooks/model/
-!jupyter_notebooks/model/*.pkl
+jupyter_notebooks/**/*.ipynb
+jupyter_notebooks/**/.ipynb_checkpoints/
+jupyter_notebooks/**/__pycache__/
 
 README.md
