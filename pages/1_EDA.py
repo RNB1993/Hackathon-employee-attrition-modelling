@@ -13,6 +13,7 @@ from dashboard_utils import (
     download_plotly_html_report,
     load_cleaned_dataset,
     render_audience_markdown,
+    short_plot_state_description,
     theme_selector,
 )
 
@@ -485,7 +486,13 @@ chart_settings = {
     "trendline": (trendline if (plot_kind == "Bivariate" and chart == "Scatter") else None),
     "summary_lines": ", ".join(summary_lines) if summary_lines else "(none)",
     "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+    "n_rows": int(len(df)),
 }
+
+chart_settings["short_description"] = short_plot_state_description(chart_settings)
+if chart_settings["short_description"]:
+    st.caption(f"Plot summary: {chart_settings['short_description']}")
+
 chart_settings_df = pd.DataFrame(
     [{"setting": k, "value": "" if v is None else str(v)} for k, v in chart_settings.items()]
 )

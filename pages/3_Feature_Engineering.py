@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -16,6 +17,7 @@ from dashboard_utils import (
     load_cleaned_dataset,
     numeric_df,
     render_audience_markdown,
+    short_plot_state_description,
     theme_selector,
 )
 
@@ -89,6 +91,16 @@ fig = px.imshow(
 fig.update_layout(height=650)
 st.plotly_chart(fig, use_container_width=True)
 
+heatmap_state = {
+    "chart": "Heatmap",
+    "title": "Spearman correlation heatmap (numeric)",
+    "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+    "n_rows": int(len(df)),
+}
+heatmap_state["short_description"] = short_plot_state_description(heatmap_state)
+if heatmap_state["short_description"]:
+    st.caption(f"Plot summary: {heatmap_state['short_description']}")
+
 st.subheader("Top correlated pairs")
 pairs = correlation_pairs(df)
 filtered = pairs[(pairs["spearman_r"].abs() >= abs_r_min)].copy().head(top_n)
@@ -120,8 +132,29 @@ fig2 = px.bar(
 fig2.update_layout(height=700)
 st.plotly_chart(fig2, use_container_width=True)
 
+bar_state = {
+    "chart": "Bar",
+    "title": "Top interaction predictors (from saved model)",
+    "model": model_label,
+    "x": "coef",
+    "y": "interaction",
+    "color": "direction",
+    "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+    "n_rows": int(len(df)),
+}
+bar_state["short_description"] = short_plot_state_description(bar_state)
+if bar_state["short_description"]:
+    st.caption(f"Plot summary: {bar_state['short_description']}")
+
 st.subheader("Download page report (HTML)")
 st.caption("Interactive HTML report (includes key charts and tables).")
+
+plot_summaries_df = pd.DataFrame(
+    [
+        {"plot": "Spearman correlation heatmap", "description": heatmap_state.get("short_description", "")},
+        {"plot": "Top interaction predictors", "description": bar_state.get("short_description", "")},
+    ]
+)
 download_plotly_html_report(
     title="Feature Engineering — Correlations & Interactions",
     file_stem="report_feature_engineering",
@@ -133,6 +166,7 @@ download_plotly_html_report(
         ("Top interaction predictors", fig2),
     ],
     tables=[
+        ("Plot summaries", plot_summaries_df),
         ("Top correlated pairs (filtered)", filtered),
         ("Interaction mapping (first 200 rows)", map_df.head(200)),
         ("Interaction importance (top 25)", imp),
