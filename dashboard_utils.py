@@ -641,18 +641,18 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#E8F5E9"),
-        # High-contrast qualitative palette so grouped traces are clearly distinguishable.
-        # (The earlier monochrome-green palette made categories hard to tell apart.)
+        # High-contrast palette with red/blue up front so groupings are unmistakable.
+        # Keep enough variety for multi-category charts.
         colorway=[
-            "#2ECC71",  # green
-            "#3498DB",  # blue
-            "#E74C3C",  # red
-            "#F1C40F",  # yellow
-            "#9B59B6",  # purple
-            "#1ABC9C",  # teal
-            "#E67E22",  # orange
-            "#EC407A",  # pink
-            "#95A5A6",  # gray
+            "#1F77B4",  # blue
+            "#D62728",  # red
+            "#17BECF",  # cyan
+            "#9467BD",  # purple
+            "#FF7F0E",  # orange
+            "#2CA02C",  # green
+            "#E377C2",  # pink
+            "#BCBD22",  # olive
+            "#7F7F7F",  # gray
         ],
         xaxis=dict(
             gridcolor="rgba(232,245,233,0.12)",
@@ -684,15 +684,15 @@ def configure_plotly_theme(theme_mode: str | None = None) -> None:
         plot_bgcolor="rgba(255,255,255,0)",
         font=dict(color="#0B1F14"),
         colorway=[
-            "#1E8449",
-            "#2980B9",
-            "#C0392B",
-            "#B7950B",
-            "#7D3C98",
-            "#117A65",
-            "#AF601A",
-            "#AD1457",
-            "#616A6B",
+            "#1F77B4",  # blue
+            "#D62728",  # red
+            "#17BECF",  # cyan
+            "#9467BD",  # purple
+            "#FF7F0E",  # orange
+            "#2CA02C",  # green
+            "#E377C2",  # pink
+            "#BCBD22",  # olive
+            "#7F7F7F",  # gray
         ],
         xaxis=dict(
             gridcolor="rgba(11,31,20,0.10)",
