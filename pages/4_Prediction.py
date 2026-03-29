@@ -23,6 +23,7 @@ from dashboard_utils import (
     predict_proba_attrition,
     probability_indicator_figure,
     render_audience_markdown,
+    short_plot_state_description,
     theme_selector,
 )
 
@@ -128,6 +129,17 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure 
         fig.update_layout(height=320, margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
+        state = {
+            "chart": "Histogram",
+            "x": feature,
+            "color": color_col,
+            "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+            "n_rows": int(len(base)),
+        }
+        state["short_description"] = short_plot_state_description(state)
+        if state["short_description"]:
+            st.caption(f"Plot summary: {state['short_description']}")
+
         try:
             pct = float((s.dropna() < float(value)).mean())
             st.caption(f"Entered value percentile (approx): {pct:.0%}")
@@ -148,6 +160,18 @@ def _plot_feature_context(base: pd.DataFrame, feature: str, value) -> go.Figure 
         )
         fig.update_layout(height=320, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
+
+        state = {
+            "chart": "Bar",
+            "x": feature,
+            "y": "count",
+            "color": "is_selected",
+            "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+            "n_rows": int(len(base)),
+        }
+        state["short_description"] = short_plot_state_description(state)
+        if state["short_description"]:
+            st.caption(f"Plot summary: {state['short_description']}")
         return fig
 
 
@@ -262,8 +286,6 @@ if score_group:
             height=320,
             margin=dict(l=10, r=10, t=40, b=10),
         )
-        st.plotly_chart(fig, use_container_width=True)
-
         show_summary_lines = st.checkbox(
             "Show mean/median lines on histogram (group)",
             value=False,
@@ -278,6 +300,20 @@ if score_group:
                     st.caption(f"Mean: {float(s.mean()):.1%} | Median: {float(s.median()):.1%}")
             except Exception:
                 pass
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        group_state = {
+            "chart": "Histogram",
+            "x": "pred_attrition_proba",
+            "color": group_color,
+            "title": "Predicted attrition probability — filtered group",
+            "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+            "n_rows": int(len(group_out)),
+        }
+        group_state["short_description"] = short_plot_state_description(group_state)
+        if group_state["short_description"]:
+            st.caption(f"Plot summary: {group_state['short_description']}")
 
         show_metrics_plot = st.checkbox(
             "Show metrics plot (group)",
@@ -319,6 +355,7 @@ if score_group:
                 {"setting": "rows_scored", "value": str(len(group_out))},
                 {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
                 {"setting": "threshold", "value": "0.50"},
+                {"setting": "short_description", "value": group_state.get("short_description", "")},
             ]
         )
         download_plotly_html_report(
@@ -424,6 +461,17 @@ try:
     if show_metrics_plot:
         gfig = probability_indicator_figure(proba, title="Predicted attrition probability", threshold=0.5)
         st.plotly_chart(gfig, use_container_width=True)
+        gauge_state = {
+            "chart": "Gauge",
+            "title": "Predicted attrition probability",
+            "threshold": 0.50,
+            "predicted_probability": float(proba),
+            "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+            "n_rows": 1,
+        }
+        gauge_state["short_description"] = short_plot_state_description(gauge_state)
+        if gauge_state["short_description"]:
+            st.caption(f"Plot summary: {gauge_state['short_description']}")
     st.dataframe(pred_row[["pred_attrition_proba", "pred_attrition_label"]], use_container_width=True)
 
     st.subheader("Download prediction")
@@ -491,6 +539,17 @@ try:
                 margin=dict(l=10, r=10, t=10, b=10),
             )
             st.plotly_chart(fig, use_container_width=True)
+            sens_state = {
+                "chart": "Line",
+                "title": "What-if sensitivity (numeric feature)",
+                "x": f,
+                "y": "pred_attrition_proba",
+                "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+                "n_rows": int(n_points),
+            }
+            sens_state["short_description"] = short_plot_state_description(sens_state)
+            if sens_state["short_description"]:
+                st.caption(f"Plot summary: {sens_state['short_description']}")
             sens_fig = fig
     else:
         if not sens_categorical:
@@ -505,6 +564,17 @@ try:
             fig = px.bar(plot_df, x=f, y="pred_attrition_proba")
             fig.update_layout(yaxis_tickformat=",.0%", height=380, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig, use_container_width=True)
+            sens_state = {
+                "chart": "Bar",
+                "title": "What-if sensitivity (categorical feature)",
+                "x": f,
+                "y": "pred_attrition_proba",
+                "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+                "n_rows": int(len(cats)),
+            }
+            sens_state["short_description"] = short_plot_state_description(sens_state)
+            if sens_state["short_description"]:
+                st.caption(f"Plot summary: {sens_state['short_description']}")
             sens_fig = fig
 
     st.subheader("Download prediction report (HTML)")
@@ -520,6 +590,7 @@ try:
             {"setting": "predicted_probability", "value": f"{proba:.4f}"},
             {"setting": "threshold", "value": "0.50"},
             {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
+            {"setting": "short_description", "value": f"Single employee predicted probability: {proba:.1%} (threshold 50%)."},
         ]
     )
 
@@ -584,8 +655,6 @@ if uploaded is not None:
             dist.update_traces(opacity=overlay_opacity)
             dist.update_layout(legend_title_text=batch_color)
         dist.update_layout(xaxis_tickformat=",.0%", height=320, margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(dist, use_container_width=True)
-
         show_summary_lines = st.checkbox(
             "Show mean/median lines on histogram (batch)",
             value=False,
@@ -600,6 +669,20 @@ if uploaded is not None:
                     st.caption(f"Mean: {float(s.mean()):.1%} | Median: {float(s.median()):.1%}")
             except Exception:
                 pass
+
+        st.plotly_chart(dist, use_container_width=True)
+
+        batch_state = {
+            "chart": "Histogram",
+            "x": "pred_attrition_proba",
+            "color": batch_color,
+            "title": "Predicted probability distribution",
+            "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+            "n_rows": int(len(out)),
+        }
+        batch_state["short_description"] = short_plot_state_description(batch_state)
+        if batch_state["short_description"]:
+            st.caption(f"Plot summary: {batch_state['short_description']}")
 
         show_metrics_plot = st.checkbox(
             "Show metrics plot (batch)",
@@ -641,6 +724,7 @@ if uploaded is not None:
                 {"setting": "rows_scored", "value": str(len(out))},
                 {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
                 {"setting": "threshold", "value": "0.50"},
+                {"setting": "short_description", "value": batch_state.get("short_description", "")},
             ]
         )
         download_plotly_html_report(

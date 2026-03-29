@@ -16,6 +16,7 @@ from dashboard_utils import (
     load_cleaned_dataset,
     metrics_bar_figure,
     render_audience_markdown,
+    short_plot_state_description,
     theme_selector,
 )
 
@@ -173,16 +174,24 @@ if test_kind.startswith("Numeric"):
         except Exception:
             pass
 
-    st.plotly_chart(fig, use_container_width=True)
-    report_fig = fig
-
-    report_settings = {
+    plot_state = {
         "test_kind": test_kind,
         "numeric_column": col,
         "target_display": target_display_name,
         "target_used_for_tests": _t,
+        "overlay_opacity": float(overlay_opacity),
+        "summary_lines": "Mean, Median" if show_summary_lines else "(none)",
         "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+        "n_rows": int(len(df)),
     }
+    plot_state["short_description"] = short_plot_state_description(plot_state)
+
+    st.plotly_chart(fig, use_container_width=True)
+    if plot_state["short_description"]:
+        st.caption(f"Plot summary: {plot_state['short_description']}")
+    report_fig = fig
+
+    report_settings = plot_state
 
     st.subheader("Assumption checks")
     sh0 = stats.shapiro(g0.sample(min(len(g0), 500), random_state=0)) if len(g0) >= 3 else None
@@ -326,7 +335,9 @@ else:
         "target_display": target_display_name,
         "target_used_for_tables": str(_t_label),
         "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+        "n_rows": int(len(df)),
     }
+    report_settings["short_description"] = short_plot_state_description(report_settings)
 
     st.subheader("Bar chart")
     plot_df = ct.reset_index().melt(id_vars=cat, var_name="target", value_name="count")
@@ -334,6 +345,8 @@ else:
     fig = px.bar(plot_df, x=cat, y="count", color="_target_group", barmode="group")
     fig.update_layout(legend_title_text=str(target_display_name or target_col))
     st.plotly_chart(fig, use_container_width=True)
+    if report_settings.get("short_description"):
+        st.caption(f"Plot summary: {report_settings['short_description']}")
     report_fig = fig
 
 st.subheader("Download page report (HTML)")

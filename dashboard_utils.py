@@ -7,7 +7,7 @@ import pickle
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -1058,6 +1058,137 @@ def probability_indicator_figure(
     )
     fig.update_layout(height=260, margin=dict(l=10, r=10, t=50, b=10))
     return fig
+
+
+def short_plot_state_description(
+    settings: Mapping[str, object] | None,
+    *,
+    max_len: int = 240,
+) -> str:
+    """Create a short human-readable description of the current plot/test state.
+
+    This is used in-app (under charts) and in downloadable HTML report settings tables.
+    It is intentionally defensive: unknown keys are ignored.
+    """
+
+    if not settings:
+        return ""
+
+    def _s(v: object | None) -> str | None:
+        if v is None:
+            return None
+        try:
+            out = str(v).strip()
+        except Exception:
+            return None
+        return out if out and out.lower() != "none" else None
+
+    def _ellipsize(text: str) -> str:
+        t = (text or "").strip()
+        if len(t) <= max_len:
+            return t
+        if max_len <= 1:
+            return t[:max_len]
+        return t[: max_len - 1].rstrip() + "…"
+
+    parts: list[str] = []
+
+    test_kind = _s(settings.get("test_kind"))
+    plot_kind = _s(settings.get("plot_kind"))
+    chart = _s(settings.get("chart"))
+
+    # --- Stats page (tests) ---
+    if test_kind:
+        if test_kind.lower().startswith("numeric"):
+            col = _s(settings.get("numeric_column"))
+            tgt = _s(settings.get("target_display")) or _s(settings.get("target_col"))
+            if col and tgt:
+                parts.append(f"Histogram of {col} split by {tgt}")
+            elif col:
+                parts.append(f"Histogram of {col}")
+            parts.append("Tests: Welch t-test + Mann–Whitney")
+        elif test_kind.lower().startswith("categorical"):
+            cat = _s(settings.get("categorical_column"))
+            tgt = _s(settings.get("target_display")) or _s(settings.get("target_col"))
+            if cat and tgt:
+                parts.append(f"Bar chart of {cat} counts by {tgt}")
+            elif cat:
+                parts.append(f"Bar chart of {cat} counts")
+            parts.append("Test: Chi-square (+ Cramér’s V)")
+        else:
+            parts.append(test_kind)
+
+        if (op := settings.get("overlay_opacity")) is not None:
+            try:
+                parts.append(f"opacity={float(op):.2f}")
+            except Exception:
+                pass
+
+        if (sl := _s(settings.get("summary_lines"))) and sl not in {"(none)", "none"}:
+            parts.append(f"ref lines: {sl}")
+
+    # --- EDA page ---
+    elif plot_kind or chart:
+        if plot_kind and chart:
+            parts.append(f"{plot_kind} {chart}")
+        else:
+            parts.append(plot_kind or chart or "Plot")
+
+        x = _s(settings.get("x"))
+        y = _s(settings.get("y"))
+        if x and y:
+            parts.append(f"x={x}, y={y}")
+        elif x:
+            parts.append(f"x={x}")
+
+        color = _s(settings.get("color"))
+        if color:
+            parts.append(f"grouped by {color}")
+
+        facet_col = _s(settings.get("facet_col"))
+        facet_row = _s(settings.get("facet_row"))
+        if facet_col and facet_row:
+            parts.append(f"facets: col={facet_col}, row={facet_row}")
+        elif facet_col:
+            parts.append(f"facet col={facet_col}")
+        elif facet_row:
+            parts.append(f"facet row={facet_row}")
+
+        if (agg := _s(settings.get("bar_aggregation"))):
+            parts.append(f"bar agg: {agg}")
+        if (tr := _s(settings.get("trendline"))) and tr.lower() != "none":
+            parts.append(f"trendline: {tr}")
+        if (sl := _s(settings.get("summary_lines"))) and sl not in {"(none)", "none"}:
+            parts.append(f"ref lines: {sl}")
+
+    # --- Prediction / other pages (generic) ---
+    else:
+        title = _s(settings.get("title"))
+        if title:
+            parts.append(title)
+        x = _s(settings.get("x"))
+        y = _s(settings.get("y"))
+        if x and y:
+            parts.append(f"x={x}, y={y}")
+        elif x:
+            parts.append(f"x={x}")
+        color = _s(settings.get("color"))
+        if color:
+            parts.append(f"grouped by {color}")
+
+    gf = settings.get("global_filters_enabled")
+    if gf is not None:
+        parts.append(f"filters={'on' if bool(gf) else 'off'}")
+
+    # Row context is useful but optional.
+    n = settings.get("n_rows")
+    if n is not None:
+        try:
+            parts.append(f"rows={int(n):,}")
+        except Exception:
+            pass
+
+    return _ellipsize("; ".join([p for p in parts if p]))
 
 
 def _audience_slug(audience: str) -> str:
