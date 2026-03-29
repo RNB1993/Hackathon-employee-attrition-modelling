@@ -19,7 +19,9 @@ from dashboard_utils import (
     interaction_mapping,
     load_cleaned_dataset,
     load_pipeline,
+    metrics_bar_figure,
     predict_proba_attrition,
+    probability_indicator_figure,
     render_audience_markdown,
     theme_selector,
 )
@@ -262,6 +264,27 @@ if score_group:
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        show_metrics_plot = st.checkbox(
+            "Show metrics plot (group)",
+            value=True,
+            help="Plots summary statistics for the scored group.",
+        )
+        if show_metrics_plot:
+            thr = 0.5
+            try:
+                s = pd.to_numeric(group_out["pred_attrition_proba"], errors="coerce").dropna()
+                metrics = {
+                    "mean proba": float(s.mean()) if len(s) else None,
+                    "median proba": float(s.median()) if len(s) else None,
+                    "p90 proba": float(s.quantile(0.90)) if len(s) else None,
+                    f"share ≥ {thr:.0%}": float((s >= thr).mean()) if len(s) else None,
+                }
+                mfig = metrics_bar_figure(metrics, title="Group scoring summary")
+                mfig.update_layout(yaxis_tickformat=",.0%")
+                st.plotly_chart(mfig, use_container_width=True)
+            except Exception:
+                pass
+
         st.subheader("Download group predictions")
         st.caption("Choose a format: CSV / Excel / TXT.")
         download_dataframe(group_out, file_stem="filtered_group_predictions", label="Download predictions")
@@ -367,6 +390,15 @@ try:
     st.success("Prediction computed.")
     proba = float(pred_row["pred_attrition_proba"].iloc[0])
     st.metric("Predicted attrition probability", f"{proba:.1%}")
+
+    show_metrics_plot = st.checkbox(
+        "Show probability gauge",
+        value=True,
+        help="Shows the predicted probability as a gauge with a 50% threshold.",
+    )
+    if show_metrics_plot:
+        gfig = probability_indicator_figure(proba, title="Predicted attrition probability", threshold=0.5)
+        st.plotly_chart(gfig, use_container_width=True)
     st.dataframe(pred_row[["pred_attrition_proba", "pred_attrition_label"]], use_container_width=True)
 
     st.subheader("Download prediction")
@@ -518,6 +550,27 @@ if uploaded is not None:
             dist.update_layout(legend_title_text=batch_color)
         dist.update_layout(xaxis_tickformat=",.0%", height=320, margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(dist, use_container_width=True)
+
+        show_metrics_plot = st.checkbox(
+            "Show metrics plot (batch)",
+            value=True,
+            help="Plots summary statistics for the uploaded batch.",
+        )
+        if show_metrics_plot:
+            thr = 0.5
+            try:
+                s = pd.to_numeric(out["pred_attrition_proba"], errors="coerce").dropna()
+                metrics = {
+                    "mean proba": float(s.mean()) if len(s) else None,
+                    "median proba": float(s.median()) if len(s) else None,
+                    "p90 proba": float(s.quantile(0.90)) if len(s) else None,
+                    f"share ≥ {thr:.0%}": float((s >= thr).mean()) if len(s) else None,
+                }
+                mfig = metrics_bar_figure(metrics, title="Batch scoring summary")
+                mfig.update_layout(yaxis_tickformat=",.0%")
+                st.plotly_chart(mfig, use_container_width=True)
+            except Exception:
+                pass
 
         st.subheader("Download predictions")
         st.caption("Choose a format: CSV / Excel / TXT.")

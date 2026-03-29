@@ -977,6 +977,89 @@ def download_dataframe(
         )
 
 
+def metrics_bar_figure(
+    metrics: dict[str, float | int | None],
+    *,
+    title: str,
+    value_format: str | None = None,
+) -> go.Figure:
+    """Create a simple bar chart for a metrics dict.
+
+    Skips None values. Intended for quick dashboard summaries.
+    """
+
+    rows: list[dict[str, object]] = []
+    for k, v in (metrics or {}).items():
+        if v is None:
+            continue
+        try:
+            val = float(v)
+        except Exception:
+            continue
+        rows.append({"metric": str(k), "value": val})
+
+    if not rows:
+        fig = go.Figure()
+        fig.update_layout(title=title)
+        return fig
+
+    dfm = pd.DataFrame(rows)
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=dfm["metric"],
+                y=dfm["value"],
+                text=[
+                    (f"{v:{value_format}}" if value_format else f"{v:.4g}")
+                    for v in dfm["value"].tolist()
+                ],
+                textposition="auto",
+            )
+        ]
+    )
+    fig.update_layout(
+        title=title,
+        margin=dict(l=10, r=10, t=50, b=10),
+        height=340,
+        xaxis_title=None,
+        yaxis_title=None,
+    )
+    return fig
+
+
+def probability_indicator_figure(
+    proba: float,
+    *,
+    title: str,
+    threshold: float = 0.5,
+) -> go.Figure:
+    """Gauge-style indicator for a probability value."""
+
+    p = float(proba)
+    p = max(0.0, min(1.0, p))
+    thr = max(0.0, min(1.0, float(threshold)))
+
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=p,
+            number={"valueformat": ".1%"},
+            title={"text": title},
+            gauge={
+                "axis": {"range": [0, 1], "tickformat": ".0%"},
+                "threshold": {
+                    "line": {"color": "red", "width": 4},
+                    "thickness": 0.75,
+                    "value": thr,
+                },
+                "bar": {"color": "#1F77B4"},
+            },
+        )
+    )
+    fig.update_layout(height=260, margin=dict(l=10, r=10, t=50, b=10))
+    return fig
+
+
 def _audience_slug(audience: str) -> str:
     return (
         (audience or "audience")
