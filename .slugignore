@@ -1,2 +1,8 @@
+# Exclude heavy notebooks from the Heroku slug...
 jupyter_notebooks/*
+
+# ...but keep the trained model artifacts needed by the Streamlit Prediction page.
+!jupyter_notebooks/model/
+!jupyter_notebooks/model/*.pkl
+
 README.md
