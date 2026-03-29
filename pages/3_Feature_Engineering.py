@@ -55,6 +55,19 @@ Feature engineering audit:
 
 render_audience_markdown(AUDIENCE_MD, audience=audience)
 
+with st.expander("How to read this page", expanded=False):
+    st.markdown(
+        """
+- The heatmap shows **Spearman correlation** between numeric variables (−1 to +1).
+- The correlation pairs table highlights the strongest relationships.
+- The interaction mapping explains the engineered features used by the prediction model.
+"""
+    )
+
+
+def _download_caption() -> None:
+    st.caption("Choose a format: CSV / Excel / TXT.")
+
 with st.sidebar:
     st.header("Controls")
     abs_r_min = st.slider("Min |Spearman r|", 0.0, 1.0, 0.3, 0.05)
@@ -78,17 +91,20 @@ st.subheader("Top correlated pairs")
 pairs = correlation_pairs(df)
 filtered = pairs[(pairs["spearman_r"].abs() >= abs_r_min)].copy().head(top_n)
 st.dataframe(filtered, use_container_width=True)
+_download_caption()
 download_dataframe(filtered, file_stem="correlation_pairs_filtered", label="Download table")
 
 st.subheader("Interaction feature mapping")
 map_df = interaction_mapping(df)
 st.caption("This maps each engineered `inter_pos_*` / `inter_neg_*` to its raw numeric feature pair.")
 st.dataframe(map_df.head(50), use_container_width=True)
+_download_caption()
 download_dataframe(map_df, file_stem="interaction_mapping", label="Download mapping")
 
 st.subheader("Top interaction predictors (from saved model)")
 imp = interaction_importance_table(model_label=model_label, dataset_for_mapping=df, top_n=25)
 st.dataframe(imp, use_container_width=True)
+_download_caption()
 download_dataframe(imp, file_stem="interaction_importance_top25", label="Download ranking")
 
 fig2 = px.bar(
@@ -103,6 +119,7 @@ fig2.update_layout(height=700)
 st.plotly_chart(fig2, use_container_width=True)
 
 st.subheader("Download page report (HTML)")
+st.caption("Interactive HTML report (includes key charts and tables).")
 download_plotly_html_report(
     title="Feature Engineering — Correlations & Interactions",
     file_stem="report_feature_engineering",

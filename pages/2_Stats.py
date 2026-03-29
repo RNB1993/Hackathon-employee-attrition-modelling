@@ -51,6 +51,15 @@ Assumption checks shown for context.
 
 render_audience_markdown(AUDIENCE_MD, audience=audience)
 
+with st.expander("How to read this page", expanded=False):
+    st.markdown(
+        """
+- **Numeric vs Target**: compares the numeric feature between employees who stayed vs left.
+- **Categorical vs Target**: checks whether the category distribution differs by target.
+- Treat p-values as *signals*, not final proof; sample size and data quality matter.
+"""
+    )
+
 report_fig = None
 report_tables: list[tuple[str, pd.DataFrame]] = []
 
@@ -149,6 +158,7 @@ if test_kind.startswith("Numeric"):
     report_tables.append(("Test results", pd.DataFrame([results])))
 
     st.subheader("Download")
+    st.caption("Choose a format: CSV / Excel / TXT.")
     download_dataframe(pd.DataFrame([results]), file_stem="stats_numeric_results", label="Download results")
 
 else:
@@ -169,6 +179,7 @@ else:
     report_tables.append(("Contingency table", ct.reset_index()))
 
     st.subheader("Download")
+    st.caption("Choose a format: CSV / Excel / TXT.")
     download_dataframe(ct.reset_index(), file_stem="stats_contingency_table", label="Download contingency")
 
     st.subheader("Chi-square results")
@@ -181,6 +192,7 @@ else:
         "target_col": target_col,
     }
     st.write(chi_results)
+    st.caption("Choose a format: CSV / Excel / TXT.")
     download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
 
     report_tables.append(("Chi-square results", pd.DataFrame([chi_results])))
@@ -195,6 +207,7 @@ else:
     report_fig = fig
 
 st.subheader("Download page report (HTML)")
+st.caption("Interactive HTML report (includes charts and result tables).")
 download_plotly_html_report(
     title="Stats — Quick Tests",
     file_stem="report_stats",
