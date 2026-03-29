@@ -457,15 +457,22 @@ button {
 
 /* Download buttons: make text + background clearly readable */
 div[data-testid="stDownloadButton"] button {
-    background: rgba(234, 245, 239, 0.95) !important;
-    border: 1px solid rgba(11, 31, 20, 0.18) !important;
-    color: #0B1F14 !important;
-    font-weight: 700 !important;
+    background: #146B3A !important;
+    border: 1px solid rgba(11, 31, 20, 0.25) !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    font-size: 1.02rem !important;
+    padding: 0.60rem 0.90rem !important;
+    border-radius: 10px !important;
+}
+
+div[data-testid="stDownloadButton"] button * {
+    color: #FFFFFF !important;
 }
 
 div[data-testid="stDownloadButton"] button:hover {
-    background: rgba(223, 240, 231, 0.98) !important;
-    border-color: rgba(11, 31, 20, 0.28) !important;
+    background: #0F5A30 !important;
+    border-color: rgba(11, 31, 20, 0.35) !important;
 }
 
 /* Links */
@@ -567,15 +574,22 @@ button {
 
 /* Download buttons: make text + background clearly readable */
 div[data-testid="stDownloadButton"] button {
-    background: rgba(46, 204, 113, 0.18) !important;
-    border: 1px solid rgba(232, 245, 233, 0.20) !important;
-    color: #E8F5E9 !important;
-    font-weight: 700 !important;
+    background: rgba(46, 204, 113, 0.92) !important;
+    border: 1px solid rgba(46, 204, 113, 0.95) !important;
+    color: #06130C !important;
+    font-weight: 800 !important;
+    font-size: 1.02rem !important;
+    padding: 0.60rem 0.90rem !important;
+    border-radius: 10px !important;
+}
+
+div[data-testid="stDownloadButton"] button * {
+    color: #06130C !important;
 }
 
 div[data-testid="stDownloadButton"] button:hover {
-    background: rgba(46, 204, 113, 0.26) !important;
-    border-color: rgba(232, 245, 233, 0.32) !important;
+    background: rgba(46, 204, 113, 0.98) !important;
+    border-color: rgba(46, 204, 113, 1.0) !important;
 }
 
 /* Links */
