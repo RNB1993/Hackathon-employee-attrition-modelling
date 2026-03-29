@@ -14,6 +14,7 @@ from dashboard_utils import (
     download_dataframe,
     download_plotly_html_report,
     load_cleaned_dataset,
+    metrics_bar_figure,
     render_audience_markdown,
     theme_selector,
 )
@@ -157,6 +158,34 @@ if test_kind.startswith("Numeric"):
     }
     st.write(results)
 
+    show_metrics_plot = st.checkbox(
+        "Show metrics plot",
+        value=True,
+        help="Visualizes key numeric results (group means + significance).",
+    )
+    if show_metrics_plot:
+        def _neglog10(pval: float | None) -> float | None:
+            try:
+                if pval is None:
+                    return None
+                p_ = float(pval)
+                if not np.isfinite(p_) or p_ <= 0:
+                    return None
+                return float(-np.log10(p_))
+            except Exception:
+                return None
+
+        mfig = metrics_bar_figure(
+            {
+                "mean(group=0)": results.get("mean_group0"),
+                "mean(group=1)": results.get("mean_group1"),
+                "-log10(p) Welch": _neglog10(results.get("welch_ttest_p")),
+                "-log10(p) MW": _neglog10(results.get("mann_whitney_p")),
+            },
+            title="Key test metrics",
+        )
+        st.plotly_chart(mfig, use_container_width=True)
+
     report_tables.append(("Test results", pd.DataFrame([results])))
 
     st.subheader("Download")
@@ -194,6 +223,33 @@ else:
         "target_col": target_col,
     }
     st.write(chi_results)
+
+    show_metrics_plot = st.checkbox(
+        "Show metrics plot",
+        value=True,
+        help="Visualizes effect size and significance summary.",
+    )
+    if show_metrics_plot:
+        def _neglog10(pval: float | None) -> float | None:
+            try:
+                if pval is None:
+                    return None
+                p_ = float(pval)
+                if not np.isfinite(p_) or p_ <= 0:
+                    return None
+                return float(-np.log10(p_))
+            except Exception:
+                return None
+
+        mfig = metrics_bar_figure(
+            {
+                "Cramér's V": chi_results.get("cramers_v"),
+                "-log10(p)": _neglog10(chi_results.get("p_value")),
+                "chi2": chi_results.get("chi2"),
+            },
+            title="Chi-square summary metrics",
+        )
+        st.plotly_chart(mfig, use_container_width=True)
     st.caption("Choose a format: CSV / Excel / TXT.")
     download_dataframe(pd.DataFrame([chi_results]), file_stem="stats_chi_square_results", label="Download results")
 
