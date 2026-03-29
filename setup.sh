@@ -1,4 +1,7 @@
 mkdir -p ~/.streamlit/
+
+# Heroku sets $PORT automatically; default locally.
+PORT=${PORT:-8501}
 echo "\
 [server]\n\
 headless = true\n\
