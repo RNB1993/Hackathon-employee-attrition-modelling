@@ -1,0 +1,8 @@
+[theme]
+# Dark-green theme
+base = "dark"
+primaryColor = "#2ECC71"                # green accent
+backgroundColor = "#0B1F14"             # deep green-black
+secondaryBackgroundColor = "#102A1D"    # cards/sidebar
+textColor = "#E8F5E9"                   # soft mint-white
+font = "sans serif"
