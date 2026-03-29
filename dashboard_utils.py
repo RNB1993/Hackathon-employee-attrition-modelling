@@ -254,6 +254,7 @@ def predict_proba_attrition(
     df_raw: pd.DataFrame,
     dataset_for_mapping: pd.DataFrame,
     target_col: str = "Attrition",
+    threshold: float = 0.5,
 ) -> pd.DataFrame:
     """Return a dataframe with predicted attrition probability for each row.
 
@@ -281,10 +282,18 @@ def predict_proba_attrition(
             f"Loaded type: {type(pipe)!r}"
         )
 
+    try:
+        thr = float(threshold)
+    except Exception as e:
+        raise TypeError(f"threshold must be a float in [0, 1], got: {threshold!r}") from e
+
+    if not (0.0 <= thr <= 1.0):
+        raise ValueError(f"threshold must be in [0, 1], got: {thr}")
+
     proba = pipe.predict_proba(X)[:, 1]
     out = df_raw.copy()
     out["pred_attrition_proba"] = proba
-    out["pred_attrition_label"] = (proba >= 0.5).astype(int)
+    out["pred_attrition_label"] = (proba >= thr).astype(int)
     return out
 
 

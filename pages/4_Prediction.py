@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -88,6 +90,43 @@ overlay_opacity = st.sidebar.slider(
     step=0.05,
     help="Lower opacity makes overlapping groups easier to distinguish.",
 )
+
+threshold = st.sidebar.slider(
+    "Classification threshold",
+    min_value=0.05,
+    max_value=0.95,
+    value=0.50,
+    step=0.05,
+    help="Controls how the predicted probability is turned into a 0/1 label. Does not change the probability itself.",
+)
+
+
+def _read_uploaded_csv(uploaded_file) -> pd.DataFrame:
+    """Read an uploaded CSV defensively (encoding + delimiter inference)."""
+
+    raw = uploaded_file.getvalue() if hasattr(uploaded_file, "getvalue") else uploaded_file.read()
+    if not raw:
+        raise ValueError("Uploaded file is empty")
+
+    # Basic guardrail to avoid accidental huge uploads.
+    max_bytes = 8 * 1024 * 1024
+    if len(raw) > max_bytes:
+        raise ValueError(f"CSV is too large ({len(raw) / (1024 * 1024):.1f} MB). Please upload ≤ 8 MB.")
+
+    last_err: Exception | None = None
+    for enc in ("utf-8", "utf-8-sig", "latin-1"):
+        try:
+            return pd.read_csv(
+                BytesIO(raw),
+                encoding=enc,
+                sep=None,
+                engine="python",
+                on_bad_lines="skip",
+            )
+        except Exception as e:
+            last_err = e
+
+    raise ValueError(f"Could not parse CSV. Last error: {last_err}")
 
 
 @st.cache_resource(show_spinner=False)
@@ -183,6 +222,12 @@ required_raw_numeric = sorted(
     set(mapping["raw_feature_1"].tolist() + mapping["raw_feature_2"].tolist())
 )
 
+# For raw uploads, require all the cleaned dataset columns (except target).
+required_raw_cols = [c for c in base_df_full.columns if c != "Attrition"]
+
+# If user uploads already-engineered interactions, raw numeric columns are optional.
+required_non_numeric = [c for c in required_raw_cols if c not in required_raw_numeric]
+
 st.subheader("Option A — Select an employee (or group) by features")
 st.caption(
     "Instead of picking a row index, filter by employee attributes. You can score a whole group, "
@@ -263,7 +308,12 @@ score_group = st.button("Score filtered group", type="secondary")
 group_out = None
 if score_group:
     try:
-        group_out = predict_proba_attrition(model_label, filtered, dataset_for_mapping=base_df_full)
+        group_out = predict_proba_attrition(
+            model_label,
+            filtered,
+            dataset_for_mapping=base_df_full,
+            threshold=float(threshold),
+        )
         st.success("Group predictions computed.")
 
         group_color = "Attrition" if "Attrition" in group_out.columns else None
@@ -321,7 +371,7 @@ if score_group:
             help="Plots summary statistics for the scored group.",
         )
         if show_metrics_plot:
-            thr = 0.5
+            thr = float(threshold)
             try:
                 s = pd.to_numeric(group_out["pred_attrition_proba"], errors="coerce").dropna()
                 metrics = {
@@ -354,7 +404,7 @@ if score_group:
                 {"setting": "model", "value": model_label},
                 {"setting": "rows_scored", "value": str(len(group_out))},
                 {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
-                {"setting": "threshold", "value": "0.50"},
+                {"setting": "threshold", "value": f"{float(threshold):.2f}"},
                 {"setting": "short_description", "value": group_state.get("short_description", "")},
             ]
         )
@@ -448,10 +498,19 @@ if override_cols:
     st.dataframe(row, width="stretch")
 
 try:
-    pred_row = predict_proba_attrition(model_label, row, dataset_for_mapping=base_df_full)
+    pred_row = predict_proba_attrition(
+        model_label,
+        row,
+        dataset_for_mapping=base_df_full,
+        threshold=float(threshold),
+    )
     st.success("Prediction computed.")
     proba = float(pred_row["pred_attrition_proba"].iloc[0])
     st.metric("Predicted attrition probability", f"{proba:.1%}")
+
+    st.caption(
+        f"Label threshold: {float(threshold):.0%} (predicted label = 1 when probability ≥ threshold)."
+    )
 
     show_metrics_plot = st.checkbox(
         "Show probability gauge",
@@ -459,12 +518,16 @@ try:
         help="Shows the predicted probability as a gauge with a 50% threshold.",
     )
     if show_metrics_plot:
-        gfig = probability_indicator_figure(proba, title="Predicted attrition probability", threshold=0.5)
+        gfig = probability_indicator_figure(
+            proba,
+            title="Predicted attrition probability",
+            threshold=float(threshold),
+        )
         st.plotly_chart(gfig, width="stretch")
         gauge_state = {
             "chart": "Gauge",
             "title": "Predicted attrition probability",
-            "threshold": 0.50,
+            "threshold": float(threshold),
             "predicted_probability": float(proba),
             "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
             "n_rows": 1,
@@ -588,9 +651,12 @@ try:
         [
             {"setting": "model", "value": model_label},
             {"setting": "predicted_probability", "value": f"{proba:.4f}"},
-            {"setting": "threshold", "value": "0.50"},
+            {"setting": "threshold", "value": f"{float(threshold):.2f}"},
             {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
-            {"setting": "short_description", "value": f"Single employee predicted probability: {proba:.1%} (threshold 50%)."},
+            {
+                "setting": "short_description",
+                "value": f"Single employee predicted probability: {proba:.1%} (threshold {float(threshold):.0%}).",
+            },
         ]
     )
 
@@ -614,10 +680,24 @@ except Exception as e:
 st.divider()
 
 st.subheader("Option B — Upload CSV (raw feature columns)")
+
+with st.expander("Download a scoring template", expanded=False):
+    st.caption(
+        "Download a CSV template with the cleaned dataset columns expected by the scoring pipeline. "
+        "You can fill in your own employee rows and re-upload."
+    )
+    template = base_df_full[required_raw_cols].head(50).copy()
+    download_dataframe(template, file_stem="scoring_template", label="Download template")
+
 uploaded = st.file_uploader("Upload a CSV", type=["csv"])
 
 if uploaded is not None:
-    up = pd.read_csv(uploaded)
+    try:
+        up = _read_uploaded_csv(uploaded)
+    except Exception as e:
+        st.error(f"Could not read uploaded CSV: {e}")
+        st.stop()
+
     st.write("Uploaded preview:")
     st.dataframe(up.head(20), width="stretch")
 
@@ -625,18 +705,32 @@ if uploaded is not None:
         c.startswith("inter_pos_") or c.startswith("inter_neg_") for c in up.columns
     )
 
-    if not already_engineered:
-        missing = ensure_required_columns(up, required_raw_numeric)
+    if already_engineered:
+        missing = ensure_required_columns(up, required_non_numeric)
         if missing:
             st.error(
-                "Uploaded CSV is missing raw numeric columns required to build engineered interactions. "
-                "Alternatively, upload a file that already contains engineered `inter_pos_*`/`inter_neg_*` columns. "
+                "Uploaded CSV contains engineered interaction columns, but is missing other required raw columns "
+                "(typically categorical features expected by the pipeline). "
+                f"Missing ({len(missing)}): {missing[:25]}" + ("..." if len(missing) > 25 else "")
+            )
+            st.stop()
+    else:
+        missing = ensure_required_columns(up, required_raw_cols)
+        if missing:
+            st.error(
+                "Uploaded CSV is missing required columns for raw scoring. "
+                "Use the template download above, or upload a file that already contains engineered `inter_pos_*`/`inter_neg_*` columns. "
                 f"Missing ({len(missing)}): {missing[:25]}" + ("..." if len(missing) > 25 else "")
             )
             st.stop()
 
     try:
-        out = predict_proba_attrition(model_label, up, dataset_for_mapping=base_df_full)
+        out = predict_proba_attrition(
+            model_label,
+            up,
+            dataset_for_mapping=base_df_full,
+            threshold=float(threshold),
+        )
         st.success("Predictions computed.")
         st.dataframe(out[["pred_attrition_proba", "pred_attrition_label"]].head(50), width="stretch")
 
@@ -690,7 +784,7 @@ if uploaded is not None:
             help="Plots summary statistics for the uploaded batch.",
         )
         if show_metrics_plot:
-            thr = 0.5
+            thr = float(threshold)
             try:
                 s = pd.to_numeric(out["pred_attrition_proba"], errors="coerce").dropna()
                 metrics = {
@@ -723,7 +817,7 @@ if uploaded is not None:
                 {"setting": "model", "value": model_label},
                 {"setting": "rows_scored", "value": str(len(out))},
                 {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
-                {"setting": "threshold", "value": "0.50"},
+                {"setting": "threshold", "value": f"{float(threshold):.2f}"},
                 {"setting": "short_description", "value": batch_state.get("short_description", "")},
             ]
         )
