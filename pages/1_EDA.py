@@ -48,6 +48,15 @@ Tip: use **color** + facets for quick stratified inspection before modeling.
 
 render_audience_markdown(AUDIENCE_MD, audience=audience)
 
+with st.expander("How to read this page", expanded=False):
+    st.markdown(
+        """
+- **Univariate** shows the distribution of a single column.
+- **Bivariate** compares two columns; use **Color** and **Facets** to compare segments.
+- If the chart becomes busy (too many groups), reduce the grouping or pick a higher-level category.
+"""
+    )
+
 all_cols = df.columns.tolist()
 numeric_cols = df.select_dtypes("number").columns.tolist()
 categorical_cols = [c for c in all_cols if c not in numeric_cols]
@@ -95,6 +104,22 @@ if color_col is not None and color_col in df.columns:
         plot_df["_color_group"] = plot_df[color_col].astype("Int64").astype(str)
         color_col = "_color_group"
 
+
+def _warn_many_groups(*, col_name: str | None, display_name: str, max_groups: int) -> None:
+    if not col_name:
+        return
+    if col_name not in plot_df.columns:
+        return
+    try:
+        n = int(plot_df[col_name].nunique(dropna=False))
+    except Exception:
+        return
+    if n > max_groups:
+        st.warning(
+            f"{display_name} has {n} unique groups. This can hide distinctions or make facets unreadable. "
+            f"Consider choosing a column with ≤ {max_groups} groups or remove that grouping."
+        )
+
 grouping_summary = []
 if color_used:
     grouping_summary.append(f"color={color_used}")
@@ -105,6 +130,10 @@ if facet_row:
 st.caption(
     "Grouping applied: " + (", ".join(grouping_summary) if grouping_summary else "(none)")
 )
+
+_warn_many_groups(col_name=color_col, display_name=f"Color ({color_used})" if color_used else "Color", max_groups=12)
+_warn_many_groups(col_name=facet_col, display_name=f"Facet col ({facet_col})" if facet_col else "Facet col", max_groups=8)
+_warn_many_groups(col_name=facet_row, display_name=f"Facet row ({facet_row})" if facet_row else "Facet row", max_groups=8)
 
 overlay_opacity = st.slider(
     "Overlay opacity (when color is used)",
@@ -208,7 +237,16 @@ else:
         chart = st.selectbox("Chart", options=["Scatter", "Box", "Bar", "Distribution"], index=0)
         trendline = "None"
         if chart == "Scatter" and x in numeric_cols and y in numeric_cols:
-            trendline = st.selectbox("Trendline", options=["None", "OLS", "LOWESS"], index=0)
+            trendline = st.selectbox("Trendline", options=["None", "OLS", "LOWESS"], index=1)
+
+        bar_agg = "Mean"
+        if chart == "Bar" and y in numeric_cols:
+            bar_agg = st.selectbox(
+                "Bar aggregation",
+                options=["Mean", "Median", "Sum", "Count"],
+                index=0,
+                help="When Y is numeric, bars summarize Y by groups of X (and optional Color/Facets).",
+            )
 
         dist_var = None
         if chart == "Distribution":
@@ -305,16 +343,28 @@ else:
                 group_cols = [c for c in [facet_row, facet_col, x, color_col] if c]
                 group_cols = list(dict.fromkeys(group_cols))  # preserve order, drop duplicates
 
-                agg = (
-                    plot_df.groupby(group_cols, dropna=False)[y]
-                    .mean()
-                    .reset_index(name=f"mean_{y}")
-                )
+                agg_name = str(bar_agg or "Mean").strip().lower()
+                if agg_name == "count":
+                    agg = plot_df.groupby(group_cols, dropna=False).size().reset_index(name="count")
+                    y_col = "count"
+                else:
+                    func_map = {
+                        "mean": "mean",
+                        "median": "median",
+                        "sum": "sum",
+                    }
+                    func = func_map.get(agg_name, "mean")
+                    y_col = f"{func}_{y}"
+                    agg = (
+                        plot_df.groupby(group_cols, dropna=False)[y]
+                        .agg(func)
+                        .reset_index(name=y_col)
+                    )
 
                 fig = px.bar(
                     agg,
                     x=x,
-                    y=f"mean_{y}",
+                    y=y_col,
                     color=color_col,
                     facet_row=facet_row,
                     facet_col=facet_col,
@@ -348,6 +398,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Download page report (HTML)")
+st.caption("Interactive HTML report (includes the selected chart and key tables).")
 download_plotly_html_report(
     title="EDA — Univariate & Bivariate (Plotly)",
     file_stem="report_eda",
@@ -362,4 +413,5 @@ st.subheader("Dataset preview")
 st.dataframe(df.head(20), use_container_width=True)
 
 st.subheader("Download dataset")
+st.caption("Choose a format: CSV / Excel / TXT.")
 download_dataframe(df, file_stem="hr_attrition_cleaned", label="Download dataset")

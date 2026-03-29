@@ -66,6 +66,15 @@ Includes scenario analysis (one-feature sensitivity) using the same feature engi
 
 render_audience_markdown(AUDIENCE_MD, audience=audience)
 
+with st.expander("How to read this page", expanded=False):
+    st.markdown(
+        """
+- The model outputs a **probability** (0–100%) of attrition risk.
+- Use **group scoring** to compare segments; use **single employee** to explore scenarios.
+- This is a decision-support tool; always combine with HR context and fairness checks.
+"""
+    )
+
 overlay_opacity = st.sidebar.slider(
     "Overlay opacity (grouped histograms)",
     min_value=0.15,
@@ -250,9 +259,11 @@ if score_group:
         st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("Download group predictions")
-        download_dataframe(group_out, file_stem="filtered_group_predictions", label="Download")
+        st.caption("Choose a format: CSV / Excel / TXT.")
+        download_dataframe(group_out, file_stem="filtered_group_predictions", label="Download predictions")
 
         st.subheader("Download group report (HTML)")
+        st.caption("Interactive HTML report (includes charts and key tables).")
         summary = (
             group_out[["pred_attrition_proba"]]
             .describe(percentiles=[0.05, 0.25, 0.5, 0.75, 0.95])
@@ -355,7 +366,8 @@ try:
     st.dataframe(pred_row[["pred_attrition_proba", "pred_attrition_label"]], use_container_width=True)
 
     st.subheader("Download prediction")
-    download_dataframe(pred_row, file_stem="single_employee_prediction", label="Download")
+    st.caption("Choose a format: CSV / Excel / TXT.")
+    download_dataframe(pred_row, file_stem="single_employee_prediction", label="Download prediction")
 
     st.subheader("Explain this prediction (based on keyed-in features)")
     default_features = override_cols[:]
@@ -435,6 +447,7 @@ try:
             sens_fig = fig
 
     st.subheader("Download prediction report (HTML)")
+    st.caption("Interactive HTML report (includes plots and input/output tables).")
     report_figs: list[tuple[str, object]] = []
     report_figs.extend(context_figs)
     if sens_fig is not None:
@@ -503,9 +516,11 @@ if uploaded is not None:
         st.plotly_chart(dist, use_container_width=True)
 
         st.subheader("Download predictions")
-        download_dataframe(out, file_stem="attrition_predictions", label="Download")
+        st.caption("Choose a format: CSV / Excel / TXT.")
+        download_dataframe(out, file_stem="attrition_predictions", label="Download predictions")
 
         st.subheader("Download batch report (HTML)")
+        st.caption("Interactive HTML report (includes charts and key tables).")
         summary = (
             out[["pred_attrition_proba"]]
             .describe(percentiles=[0.05, 0.25, 0.5, 0.75, 0.95])
