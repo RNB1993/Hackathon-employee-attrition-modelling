@@ -264,6 +264,21 @@ if score_group:
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        show_summary_lines = st.checkbox(
+            "Show mean/median lines on histogram (group)",
+            value=False,
+            help="Adds reference lines to the probability distribution.",
+        )
+        if show_summary_lines:
+            try:
+                s = pd.to_numeric(group_out["pred_attrition_proba"], errors="coerce").dropna()
+                if len(s):
+                    fig.add_vline(x=float(s.mean()), line_dash="dash", line_width=3, line_color="#D62728")
+                    fig.add_vline(x=float(s.median()), line_dash="dot", line_width=3, line_color="#1F77B4")
+                    st.caption(f"Mean: {float(s.mean()):.1%} | Median: {float(s.median()):.1%}")
+            except Exception:
+                pass
+
         show_metrics_plot = st.checkbox(
             "Show metrics plot (group)",
             value=True,
@@ -297,6 +312,15 @@ if score_group:
             .reset_index()
             .rename(columns={"index": "metric"})
         )
+
+        settings_df = pd.DataFrame(
+            [
+                {"setting": "model", "value": model_label},
+                {"setting": "rows_scored", "value": str(len(group_out))},
+                {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
+                {"setting": "threshold", "value": "0.50"},
+            ]
+        )
         download_plotly_html_report(
             title=f"Prediction — Group Scoring ({model_label})",
             file_stem="report_prediction_group",
@@ -305,6 +329,7 @@ if score_group:
             theme_mode=theme_mode,
             figures=[("Group probability distribution", fig)],
             tables=[
+                ("Chart description / settings", settings_df),
                 ("Summary stats", summary),
                 ("Predictions (first 200 rows)", group_out.head(200)),
             ],
@@ -489,6 +514,15 @@ try:
     if sens_fig is not None:
         report_figs.append(("What-if sensitivity", sens_fig))
 
+    settings_df = pd.DataFrame(
+        [
+            {"setting": "model", "value": model_label},
+            {"setting": "predicted_probability", "value": f"{proba:.4f}"},
+            {"setting": "threshold", "value": "0.50"},
+            {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
+        ]
+    )
+
     download_plotly_html_report(
         title=f"Prediction — Single Employee ({model_label})",
         file_stem="report_prediction_single",
@@ -497,6 +531,7 @@ try:
         theme_mode=theme_mode,
         figures=report_figs if report_figs else None,
         tables=[
+            ("Chart description / settings", settings_df),
             ("Input row (raw)", row_base.reset_index(drop=True)),
             ("Input row (after overrides)", row.reset_index(drop=True)),
             ("Prediction output", pred_row.reset_index(drop=True)),
@@ -551,6 +586,21 @@ if uploaded is not None:
         dist.update_layout(xaxis_tickformat=",.0%", height=320, margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(dist, use_container_width=True)
 
+        show_summary_lines = st.checkbox(
+            "Show mean/median lines on histogram (batch)",
+            value=False,
+            help="Adds reference lines to the probability distribution.",
+        )
+        if show_summary_lines:
+            try:
+                s = pd.to_numeric(out["pred_attrition_proba"], errors="coerce").dropna()
+                if len(s):
+                    dist.add_vline(x=float(s.mean()), line_dash="dash", line_width=3, line_color="#D62728")
+                    dist.add_vline(x=float(s.median()), line_dash="dot", line_width=3, line_color="#1F77B4")
+                    st.caption(f"Mean: {float(s.mean()):.1%} | Median: {float(s.median()):.1%}")
+            except Exception:
+                pass
+
         show_metrics_plot = st.checkbox(
             "Show metrics plot (batch)",
             value=True,
@@ -584,6 +634,15 @@ if uploaded is not None:
             .reset_index()
             .rename(columns={"index": "metric"})
         )
+
+        settings_df = pd.DataFrame(
+            [
+                {"setting": "model", "value": model_label},
+                {"setting": "rows_scored", "value": str(len(out))},
+                {"setting": "global_filters_enabled", "value": str(bool(st.session_state.get("global__enabled", True)))},
+                {"setting": "threshold", "value": "0.50"},
+            ]
+        )
         download_plotly_html_report(
             title=f"Prediction — Batch Scoring ({model_label})",
             file_stem="report_prediction_batch",
@@ -592,6 +651,7 @@ if uploaded is not None:
             theme_mode=theme_mode,
             figures=[("Batch probability distribution", dist)],
             tables=[
+                ("Chart description / settings", settings_df),
                 ("Summary stats", summary),
                 ("Predictions (first 200 rows)", out.head(200)),
             ],

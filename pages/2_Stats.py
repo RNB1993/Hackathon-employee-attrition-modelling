@@ -65,6 +65,7 @@ with st.expander("How to read this page", expanded=False):
 
 report_fig = None
 report_tables: list[tuple[str, pd.DataFrame]] = []
+report_settings: dict[str, object] = {}
 
 overlay_opacity = st.slider(
     "Overlay opacity (grouped histograms)",
@@ -75,16 +76,43 @@ overlay_opacity = st.slider(
     help="Lower opacity makes overlapping groups easier to distinguish.",
 )
 
-# Normalize target to binary 0/1
-if "Attrition" in df.columns and df["Attrition"].dtype == object:
-    y = (df["Attrition"].astype(str).str.lower() == "yes").astype(int)
-    df = df.copy()
-    df["Attrition_bin"] = y
-    target_col = "Attrition_bin"
-elif "Attrition" in df.columns:
-    target_col = "Attrition"
+# Normalize target + build human-readable labels for plotting/tables
+target_col = None
+target_bin_col: str | None = None
+target_label_col: str | None = None
+target_display_name: str | None = None
+
+if "Attrition" in df.columns:
+    target_display_name = "Attrition"
+    if df["Attrition"].dtype == object:
+        df = df.copy()
+        df["Attrition_label"] = (
+            df["Attrition"].astype(str).fillna("(missing)").str.strip().str.title()
+        )
+        df["Attrition_bin"] = (df["Attrition"].astype(str).str.lower() == "yes").astype(int)
+        target_bin_col = "Attrition_bin"
+        target_label_col = "Attrition_label"
+        target_col = target_bin_col
+    else:
+        target_col = "Attrition"
 else:
     target_col = st.selectbox("Target column", options=df.columns)
+    target_display_name = str(target_col)
+
+if target_col is not None and target_label_col is None:
+    # If target is numeric binary, prefer No/Yes labels.
+    try:
+        vals = set(pd.to_numeric(df[target_col], errors="coerce").dropna().unique().tolist())
+    except Exception:
+        vals = set()
+    if vals.issubset({0.0, 1.0}):
+        df = df.copy()
+        df["_target_label"] = (
+            pd.to_numeric(df[target_col], errors="coerce")
+            .map({0.0: "No", 1.0: "Yes"})
+            .fillna("(missing)")
+        )
+        target_label_col = "_target_label"
 
 num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 cat_cols = [c for c in df.columns if c not in num_cols]
@@ -99,27 +127,62 @@ with st.sidebar:
 if test_kind.startswith("Numeric"):
     col = st.selectbox("Numeric column", options=[c for c in num_cols if c != target_col])
 
-    g0 = df[df[target_col] == 0][col].dropna()
-    g1 = df[df[target_col] == 1][col].dropna()
+    # Use the binary target if present; otherwise, fall back to the selected target.
+    _t = target_bin_col or target_col
+
+    try:
+        tvals = pd.to_numeric(df[_t], errors="coerce").dropna().unique().tolist()
+        tvals = sorted(set(float(v) for v in tvals))
+    except Exception:
+        tvals = []
+    if len(tvals) != 2 or not set(tvals).issubset({0.0, 1.0}):
+        st.error(
+            "Numeric vs Target tests require a binary target (0/1). "
+            f"Current target '{_t}' has values: {tvals[:10]}" + ("..." if len(tvals) > 10 else "")
+        )
+        st.stop()
+
+    g0 = df[df[_t] == 0][col].dropna()
+    g1 = df[df[_t] == 1][col].dropna()
 
     st.subheader("Group distributions")
 
     plot_df = df.copy()
-    color_col = target_col
-    # If the target is a small-cardinality numeric column (e.g., 0/1), force discrete colors.
-    try:
-        nunique = int(plot_df[target_col].nunique(dropna=False))
-    except Exception:
-        nunique = 999
-    if pd.api.types.is_numeric_dtype(plot_df[target_col]) and nunique <= 10:
-        plot_df["_target_group"] = plot_df[target_col].astype("Int64").astype(str)
-        color_col = "_target_group"
+    # Prefer a human-readable target label if we have one.
+    if target_label_col and target_label_col in plot_df.columns:
+        plot_df["_target_group"] = plot_df[target_label_col].astype(str)
+    else:
+        plot_df["_target_group"] = plot_df[target_col].astype(str)
+    color_col = "_target_group"
 
     fig = px.histogram(plot_df, x=col, color=color_col, barmode="overlay", marginal="box")
     fig.update_traces(opacity=overlay_opacity)
-    fig.update_layout(legend_title_text=str(target_col))
+    fig.update_layout(legend_title_text=str(target_display_name or target_col))
+
+    show_summary_lines = st.checkbox(
+        "Show mean/median lines on histogram",
+        value=False,
+        help="Adds reference lines to help compare distributions.",
+    )
+    if show_summary_lines:
+        try:
+            overall = pd.to_numeric(plot_df[col], errors="coerce").dropna()
+            if len(overall):
+                fig.add_vline(x=float(overall.mean()), line_dash="dash", line_width=3, line_color="#D62728")
+                fig.add_vline(x=float(overall.median()), line_dash="dot", line_width=3, line_color="#1F77B4")
+        except Exception:
+            pass
+
     st.plotly_chart(fig, use_container_width=True)
     report_fig = fig
+
+    report_settings = {
+        "test_kind": test_kind,
+        "numeric_column": col,
+        "target_display": target_display_name,
+        "target_used_for_tests": _t,
+        "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+    }
 
     st.subheader("Assumption checks")
     sh0 = stats.shapiro(g0.sample(min(len(g0), 500), random_state=0)) if len(g0) >= 3 else None
@@ -154,7 +217,7 @@ if test_kind.startswith("Numeric"):
         "n_group0": int(len(g0)),
         "n_group1": int(len(g1)),
         "column": col,
-        "target_col": target_col,
+        "target_col": target_display_name or target_col,
     }
     st.write(results)
 
@@ -195,7 +258,9 @@ if test_kind.startswith("Numeric"):
 else:
     cat = st.selectbox("Categorical column", options=[c for c in cat_cols if c != target_col])
 
-    ct = pd.crosstab(df[cat], df[target_col], dropna=False)
+    # Prefer labeled target columns so tables/charts show No/Yes instead of 0/1.
+    _t_label = target_label_col if (target_label_col and target_label_col in df.columns) else target_col
+    ct = pd.crosstab(df[cat], df[_t_label], dropna=False)
     chi2, p, dof, expected = stats.chi2_contingency(ct)
 
     # Cramér's V
@@ -220,7 +285,7 @@ else:
         "dof": int(dof),
         "cramers_v": float(cramers_v),
         "categorical_col": cat,
-        "target_col": target_col,
+        "target_col": target_display_name or target_col,
     }
     st.write(chi_results)
 
@@ -255,17 +320,29 @@ else:
 
     report_tables.append(("Chi-square results", pd.DataFrame([chi_results])))
 
+    report_settings = {
+        "test_kind": test_kind,
+        "categorical_column": cat,
+        "target_display": target_display_name,
+        "target_used_for_tables": str(_t_label),
+        "global_filters_enabled": bool(st.session_state.get("global__enabled", True)),
+    }
+
     st.subheader("Bar chart")
-    plot_df = ct.reset_index().melt(id_vars=cat, var_name=target_col, value_name="count")
-    # Force discrete colors for small numeric targets.
-    plot_df["_target_group"] = plot_df[target_col].astype(str)
+    plot_df = ct.reset_index().melt(id_vars=cat, var_name="target", value_name="count")
+    plot_df["_target_group"] = plot_df["target"].astype(str)
     fig = px.bar(plot_df, x=cat, y="count", color="_target_group", barmode="group")
-    fig.update_layout(legend_title_text=str(target_col))
+    fig.update_layout(legend_title_text=str(target_display_name or target_col))
     st.plotly_chart(fig, use_container_width=True)
     report_fig = fig
 
 st.subheader("Download page report (HTML)")
 st.caption("Interactive HTML report (includes charts and result tables).")
+
+settings_df = pd.DataFrame(
+    [{"setting": str(k), "value": "" if v is None else str(v)} for k, v in (report_settings or {}).items()]
+)
+
 download_plotly_html_report(
     title="Stats — Quick Tests",
     file_stem="report_stats",
@@ -273,5 +350,5 @@ download_plotly_html_report(
     audience_markdown=AUDIENCE_MD,
     theme_mode=theme_mode,
     figures=[("Selected test chart", report_fig)] if report_fig is not None else None,
-    tables=report_tables,
+    tables=[("Chart description / settings", settings_df)] + report_tables,
 )
