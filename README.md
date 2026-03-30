@@ -244,7 +244,7 @@ The dataset was used in compliance with data protection standards (UK GDPR), ens
 ## Dashboard Design
 ## Dashboard Screenshot
 
-![Employee Attrition Dashboard](images/dashboard.png)
+![Employee Attrition Dashboard](images/Dashboard.png)
 
 This project includes both a Power BI dashboard design and a deployed multi-page Streamlit dashboard implementation.
 
