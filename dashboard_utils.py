@@ -188,7 +188,6 @@ def engineer_interactions(
     # Build pos and neg in the same order as mapping
     for row in mapping.itertuples(index=False):
         inter = row.interaction
-        f1 = row.raw_feature_1
         f2 = row.raw_feature_2
         r = float(row.spearman_r)
 
@@ -808,7 +807,7 @@ def apply_global_filters(
             help="When enabled, filters apply to charts and tables on every page.",
         )
 
-        with st.expander("Filters", expanded=False):
+        with st.expander("Filters", expanded=True):
             st.caption("Tip: Keep groupings small (e.g., ≤ 12 categories) for clearer plots.")
 
             # Choose a pragmatic set of columns if they exist.
