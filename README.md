@@ -8,6 +8,9 @@
 
 ```text
 Hackathon-employee-attrition-modelling/
+|-- app.py
+|-- dashboard_utils.py
+|-- interaction_ranked_top25.txt
 |-- Procfile
 |-- README.md
 |-- requirements.txt
@@ -23,6 +26,11 @@ Hackathon-employee-attrition-modelling/
 |   |-- Feature_engineering.ipynb
 |   |-- Stats_Tests.ipynb
 |   `-- model/
+|-- pages/
+|   |-- 1_EDA.py
+|   |-- 2_Stats.py
+|   |-- 3_Feature_Engineering.py
+|   `-- 4_Prediction.py
 ```
 # Team Members
     Role: PM / Scrum master
@@ -238,6 +246,10 @@ The dataset was used in compliance with data protection standards (UK GDPR), ens
 
 ![Employee Attrition Dashboard](images/dashboard.png)
 
+This project includes both a Power BI dashboard design and a deployed multi-page Streamlit dashboard implementation.
+
+### Power BI Dashboard Design
+
 This single-page Power BI dashboard was designed to test four hypotheses related to employee attrition. It includes the following components:
 Widgets and Layout
 
@@ -273,6 +285,20 @@ Each visual includes a short insight summarising the pattern (e.g., “Overtime 
 
 Design Strategy
 The dashboard was designed to balance analytical depth with clarity. Visuals are grouped in a 2×2 grid to reflect the four hypotheses. Colour consistency, font alignment, and minimal text ensure readability. The layout supports both quick scanning and deeper exploration.
+
+### Streamlit Dashboard (Implemented in this Repository)
+
+The Streamlit application is built as a multi-page analytics dashboard with a shared theme and reusable helper functions:
+
+- `app.py` provides the landing page, dashboard context, and navigation entry point.
+- `dashboard_utils.py` centralises styling, audience views, and reusable chart/dashboard helpers.
+- The `pages/` folder separates content into dedicated modules:
+    - `1_EDA.py` for exploratory visual analysis
+    - `2_Stats.py` for statistical testing views
+    - `3_Feature_Engineering.py` for engineered feature exploration
+    - `4_Prediction.py` for model interpretation and prediction-facing outputs
+
+This structure makes the dashboard easier to maintain and allows users to move through the full analysis workflow in a clear sequence.
 
 ## Main Data Analysis Libraries
 
