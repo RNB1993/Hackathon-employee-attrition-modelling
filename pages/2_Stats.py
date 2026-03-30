@@ -31,6 +31,13 @@ st.title("Stats — Quick Tests")
 df = load_cleaned_dataset()
 df = apply_global_filters(df)
 
+if df is None or df.empty:
+    st.warning(
+        "No rows match the current global filters. "
+        "Reset or broaden filters in the sidebar to run tests."
+    )
+    st.stop()
+
 audience = audience_selector()
 
 AUDIENCE_MD = {

@@ -40,6 +40,13 @@ st.title("Prediction — Attrition Probability")
 base_df_full = load_cleaned_dataset()
 base_df = apply_global_filters(base_df_full)
 
+if base_df is None or base_df.empty:
+    st.warning(
+        "No rows match the current global filters. "
+        "Reset or broaden filters in the sidebar to use Prediction."
+    )
+    st.stop()
+
 audience = audience_selector()
 
 with st.sidebar:

@@ -28,6 +28,13 @@ st.title("EDA — Univariate & Bivariate (Plotly)")
 df = load_cleaned_dataset()
 df = apply_global_filters(df)
 
+if df is None or df.empty:
+    st.warning(
+        "No rows match the current global filters. "
+        "Reset or broaden filters in the sidebar to see charts."
+    )
+    st.stop()
+
 audience = audience_selector()
 
 AUDIENCE_MD = {
@@ -256,9 +263,16 @@ if plot_kind == "Univariate":
             if show_summary_lines and summary_lines:
                 _add_vlines(fig, plot_df[col])
         elif chart == "Box":
+            x_group = None
+            if color_col and color_col in plot_df.columns:
+                try:
+                    if not pd.api.types.is_numeric_dtype(plot_df[color_col]):
+                        x_group = color_col
+                except Exception:
+                    x_group = None
             fig = px.box(
                 plot_df,
-                x=color if color in categorical_cols else None,
+                x=x_group,
                 y=col,
                 color=color_col,
                 facet_row=facet_row,
@@ -273,9 +287,16 @@ if plot_kind == "Univariate":
                 except Exception:
                     pass
         elif chart == "Violin":
+            x_group = None
+            if color_col and color_col in plot_df.columns:
+                try:
+                    if not pd.api.types.is_numeric_dtype(plot_df[color_col]):
+                        x_group = color_col
+                except Exception:
+                    x_group = None
             fig = px.violin(
                 plot_df,
-                x=color if color in categorical_cols else None,
+                x=x_group,
                 y=col,
                 color=color_col,
                 facet_row=facet_row,
@@ -286,8 +307,26 @@ if plot_kind == "Univariate":
                 points="all",
             )
         else:
-            counts = df[col].value_counts(dropna=False).rename_axis(col).reset_index(name="count")
-            fig = px.bar(counts, x=col, y="count")
+            group_cols = [col]
+            if color_col and color_col != col:
+                group_cols.append(color_col)
+            if facet_row and facet_row not in group_cols:
+                group_cols.append(facet_row)
+            if facet_col and facet_col not in group_cols:
+                group_cols.append(facet_col)
+
+            counts = plot_df.groupby(group_cols, dropna=False).size().reset_index(name="count")
+            fig = px.bar(
+                counts,
+                x=col,
+                y="count",
+                color=(color_col if color_col and color_col != col else None),
+                facet_row=facet_row,
+                facet_col=facet_col,
+                facet_col_spacing=facet_col_spacing,
+                facet_row_spacing=facet_row_spacing,
+                barmode=("group" if (color_col and color_col != col) else "relative"),
+            )
 
         _style_facet_annotations(fig)
 
