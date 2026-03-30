@@ -10,3 +10,9 @@ cloudinary_python.txt
 kaggle.json
 .venv/
 .venv_heroku_test/
+
+# Local recovery / editor artifacts
+recovered_src/
+
+# Optional non-app artifacts
+artifacts/
